@@ -3,84 +3,128 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Vibration Monitoring Chart</title>
+    <title>Vibration Monitor - Mobile</title>
     <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
     <style>
-        body {
-            font-family: Arial, sans-serif;
+        * {
+            box-sizing: border-box;
             margin: 0;
-            padding: 20px;
-            background-color: #f5f5f5;
+            padding: 0;
         }
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            background: white;
-            border-radius: 10px;
-            padding: 20px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        .header {
-            text-align: center;
-            margin-bottom: 20px;
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 10px;
             color: #333;
         }
-        .status-bar {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            background: #f8f9fa;
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            border-left: 4px solid #007bff;
+        
+        .container {
+            max-width: 100%;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
         }
-        .status-item {
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
             text-align: center;
         }
+        
+        .header h1 {
+            font-size: 1.5rem;
+            margin-bottom: 5px;
+            font-weight: 700;
+        }
+        
+        .header p {
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+        
+        .status-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            padding: 15px;
+            background: #f8f9fa;
+        }
+        
+        .status-card {
+            background: white;
+            padding: 15px;
+            border-radius: 15px;
+            text-align: center;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            border: 2px solid transparent;
+            transition: all 0.3s ease;
+        }
+        
+        .status-card:active {
+            transform: scale(0.98);
+        }
+        
         .status-value {
-            font-size: 24px;
+            font-size: 1.8rem;
             font-weight: bold;
             margin-bottom: 5px;
         }
+        
         .status-label {
-            font-size: 12px;
+            font-size: 0.8rem;
             color: #666;
             text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
-        .zone-a { color: #28a745; }
-        .zone-b { color: #ffc107; }
-        .zone-c { color: #fd7e14; }
-        .zone-d { color: #dc3545; }
+        
+        .zone-a { color: #28a745; border-color: #28a745; }
+        .zone-b { color: #ffc107; border-color: #ffc107; }
+        .zone-c { color: #fd7e14; border-color: #fd7e14; }
+        .zone-d { color: #dc3545; border-color: #dc3545; }
+        
+        .chart-section {
+            padding: 15px;
+        }
         
         .chart-container {
             width: 100%;
-            height: 400px;
-            margin: 20px 0;
+            height: 300px;
+            background: white;
+            border-radius: 15px;
+            margin-bottom: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            overflow: hidden;
         }
         
         .zone-legend {
-            display: flex;
-            justify-content: center;
-            gap: 20px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
             margin: 15px 0;
-            padding: 10px;
-            background: #f8f9fa;
-            border-radius: 8px;
+            font-size: 0.75rem;
         }
         
         .zone-legend-item {
             display: flex;
             align-items: center;
-            gap: 8px;
-            font-size: 12px;
-            font-weight: bold;
+            gap: 6px;
+            padding: 8px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
         }
         
         .zone-dot {
-            width: 12px;
-            height: 12px;
+            width: 8px;
+            height: 8px;
             border-radius: 50%;
+            flex-shrink: 0;
         }
         
         .zone-dot.zone-a { background-color: #28a745; }
@@ -88,31 +132,149 @@
         .zone-dot.zone-c { background-color: #fd7e14; }
         .zone-dot.zone-d { background-color: #dc3545; }
         
-        .threshold-info {
-            background: #e3f2fd;
-            border: 1px solid #90caf9;
-            border-radius: 8px;
-            padding: 15px;
-            margin: 15px 0;
-            font-size: 12px;
+        .predictions {
+            margin: 15px;
+            background: white;
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
         }
         
-        .threshold-info h4 {
-            margin: 0 0 10px 0;
+        .predictions-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px;
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+        
+        .pred-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1px;
+            background: #e9ecef;
+        }
+        
+        .pred-item {
+            background: white;
+            padding: 15px;
+            text-align: center;
+        }
+        
+        .pred-time {
+            font-size: 0.75rem;
+            color: #666;
+            margin-bottom: 8px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        
+        .pred-value {
+            font-size: 1.2rem;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .pred-desc {
+            font-size: 0.7rem;
+            color: #888;
+        }
+        
+        .maintenance-card {
+            margin: 15px;
+            background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+            border-radius: 15px;
+            padding: 15px;
+            text-align: center;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        
+        .maintenance-card h4 {
+            color: #856404;
+            margin-bottom: 8px;
+            font-size: 1rem;
+        }
+        
+        .maintenance-card p {
+            color: #856404;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+        
+        .refresh-section {
+            padding: 15px;
+            text-align: center;
+        }
+        
+        .refresh-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 25px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+            transition: all 0.3s ease;
+            font-size: 0.9rem;
+        }
+        
+        .refresh-btn:active {
+            transform: scale(0.95);
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 30px;
+            color: #666;
+            font-style: italic;
+        }
+        
+        .status-indicator {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #28a745;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+        
+        .threshold-info {
+            margin: 15px;
+            background: white;
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        
+        .threshold-header {
+            background: #e3f2fd;
+            padding: 12px;
+            font-weight: bold;
+            font-size: 0.9rem;
             color: #1976d2;
-            font-size: 14px;
+            text-align: center;
         }
         
         .threshold-list {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 10px;
+            grid-template-columns: 1fr 1fr;
+            gap: 1px;
+            background: #e9ecef;
         }
         
         .threshold-item {
-            padding: 8px;
-            border-radius: 4px;
+            padding: 12px 8px;
             text-align: center;
+            font-size: 0.7rem;
             font-weight: bold;
         }
         
@@ -121,133 +283,154 @@
         .threshold-item.zone-c { background-color: #fff3e0; color: #e65100; }
         .threshold-item.zone-d { background-color: #ffebee; color: #c62828; }
         
-        .predictions {
-            background: #e9ecef;
-            padding: 15px;
-            border-radius: 8px;
-            margin-top: 20px;
-        }
-        .predictions h3 {
-            margin-top: 0;
-            color: #495057;
-        }
-        .pred-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 15px;
-            margin-top: 15px;
-        }
-        .pred-item {
-            background: white;
-            padding: 15px;
-            border-radius: 6px;
-            text-align: center;
-            border: 2px solid #dee2e6;
-        }
-        .pred-time {
-            font-size: 14px;
-            color: #666;
-            margin-bottom: 8px;
+        .threshold-item div:first-child {
             font-weight: bold;
-        }
-        .pred-value {
-            font-size: 18px;
-            font-weight: bold;
-            margin-bottom: 5px;
-        }
-        .pred-desc {
-            font-size: 12px;
-            color: #666;
+            margin-bottom: 2px;
         }
         
-        .refresh-info {
-            text-align: center;
-            color: #666;
-            font-size: 12px;
-            margin-top: 15px;
+        .threshold-item div:nth-child(2) {
+            font-size: 0.65rem;
+            margin-bottom: 2px;
         }
         
-        .loading {
-            text-align: center;
-            padding: 40px;
-            color: #666;
+        .threshold-item div:last-child {
+            font-size: 0.6rem;
+            opacity: 0.8;
         }
         
-        .maintenance-advice {
-            background: #fff3cd;
-            border: 1px solid #ffeaa7;
-            border-radius: 8px;
-            padding: 15px;
-            margin-top: 15px;
-            text-align: center;
+        /* Responsive improvements */
+        @media (max-width: 480px) {
+            body {
+                padding: 5px;
+            }
+            
+            .header h1 {
+                font-size: 1.3rem;
+            }
+            
+            .status-value {
+                font-size: 1.5rem;
+            }
+            
+            .chart-container {
+                height: 250px;
+            }
+            
+            .zone-legend {
+                grid-template-columns: 1fr;
+            }
+            
+            .pred-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .threshold-list {
+                grid-template-columns: 1fr;
+            }
         }
         
-        .maintenance-advice h4 {
-            margin: 0 0 10px 0;
-            color: #856404;
+        /* Landscape mode adjustments */
+        @media (orientation: landscape) and (max-height: 600px) {
+            .chart-container {
+                height: 200px;
+            }
+            
+            .header {
+                padding: 15px;
+            }
+            
+            .header h1 {
+                font-size: 1.2rem;
+            }
         }
         
-        .maintenance-advice p {
-            margin: 0;
-            color: #856404;
-            font-weight: bold;
+        /* Dark mode support */
+        @media (prefers-color-scheme: dark) {
+            body {
+                background: linear-gradient(135deg, #2c3e50 0%, #4a5568 100%);
+            }
+            
+            .container {
+                background: rgba(45, 55, 72, 0.95);
+                color: white;
+            }
+            
+            .status-card, .zone-legend-item, .predictions, .pred-item {
+                background: #4a5568;
+                color: white;
+            }
+            
+            .threshold-info {
+                background: #4a5568;
+            }
+            
+            .threshold-header {
+                background: #2d3748;
+                color: #90cdf4;
+            }
         }
     </style>
 </head>
 <body>
     <div class="container">
+        <div class="status-indicator"></div>
+        
         <div class="header">
-            <h1>Vibration Monitoring System</h1>
-            <p>Real-time Machine Health Monitoring</p>
+            <h1>🔧 Vibration Monitor</h1>
+            <p>Real-time Machine Health</p>
         </div>
         
-        <div class="status-bar" id="statusBar">
-            <div class="status-item">
+        <div class="status-grid">
+            <div class="status-card">
                 <div class="status-value" id="currentRMS">--</div>
-                <div class="status-label">Current RMS (mm/s)</div>
+                <div class="status-label">RMS (mm/s)</div>
             </div>
-            <div class="status-item">
+            <div class="status-card">
                 <div class="status-value" id="currentZone">--</div>
-                <div class="status-label">Current Zone</div>
+                <div class="status-label">Zone</div>
             </div>
-            <div class="status-item">
+            <div class="status-card">
                 <div class="status-value" id="currentStatus">--</div>
                 <div class="status-label">Status</div>
             </div>
-            <div class="status-item">
+            <div class="status-card">
                 <div class="status-value" id="lastUpdate">--</div>
                 <div class="status-label">Last Update</div>
             </div>
         </div>
         
-        <div id="chartContainer" class="chart-container"></div>
-        
-        <div class="zone-legend">
-            <div class="zone-legend-item">
-                <div class="zone-dot zone-a"></div>
-                <span>Zone A: Good (< 1.12 mm/s)</span>
-            </div>
-            <div class="zone-legend-item">
-                <div class="zone-dot zone-b"></div>
-                <span>Zone B: Acceptable (1.12 - 4.5 mm/s)</span>
-            </div>
-            <div class="zone-legend-item">
-                <div class="zone-dot zone-c"></div>
-                <span>Zone C: Caution (4.5 - 11.2 mm/s)</span>
-            </div>
-            <div class="zone-legend-item">
-                <div class="zone-dot zone-d"></div>
-                <span>Zone D: Critical (> 11.2 mm/s)</span>
+        <div class="chart-section">
+            <div id="chartContainer" class="chart-container"></div>
+            
+            <div class="zone-legend">
+                <div class="zone-legend-item">
+                    <div class="zone-dot zone-a"></div>
+                    <span>Zone A: Good</span>
+                </div>
+                <div class="zone-legend-item">
+                    <div class="zone-dot zone-b"></div>
+                    <span>Zone B: Acceptable</span>
+                </div>
+                <div class="zone-legend-item">
+                    <div class="zone-dot zone-c"></div>
+                    <span>Zone C: Caution</span>
+                </div>
+                <div class="zone-legend-item">
+                    <div class="zone-dot zone-d"></div>
+                    <span>Zone D: Critical</span>
+                </div>
             </div>
         </div>
         
         <div class="threshold-info">
-            <h4>ISO 10816-1 Zones for Class I Machines (< 15kW)</h4>
+            <div class="threshold-header">
+                📊 ISO 10816-1 Zones (Class I: < 15kW)
+            </div>
             <div class="threshold-list">
                 <div class="threshold-item zone-a">
                     <div>Zone A: Good</div>
                     <div>0 - 1.12 mm/s</div>
-                    <div>Continue normal operation</div>
+                    <div>Continue operation</div>
                 </div>
                 <div class="threshold-item zone-b">
                     <div>Zone B: Acceptable</div>
@@ -262,26 +445,32 @@
                 <div class="threshold-item zone-d">
                     <div>Zone D: Critical</div>
                     <div>> 11.2 mm/s</div>
-                    <div>Immediate action required</div>
+                    <div>Immediate action</div>
                 </div>
             </div>
         </div>
         
-        <div class="predictions" id="predictions">
-            <h3>Trend Predictions</h3>
+        <div class="predictions">
+            <div class="predictions-header">
+                🔮 Trend Predictions
+            </div>
             <div class="pred-grid" id="predGrid">
                 <div class="loading">Loading predictions...</div>
             </div>
         </div>
         
-        <div class="maintenance-advice" id="maintenanceAdvice" style="display: none;">
-            <h4>Maintenance Recommendation</h4>
+        <div class="maintenance-card" id="maintenanceAdvice" style="display: none;">
+            <h4>⚠️ Maintenance Recommendation</h4>
             <p id="adviceText">--</p>
         </div>
         
-        <div class="refresh-info">
-            <p>Data updates automatically every 30 seconds</p>
-            <button onclick="forceRefresh()" style="background: #007bff; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer;">Refresh Now</button>
+        <div class="refresh-section">
+            <p style="font-size: 0.8rem; color: #666; margin-bottom: 10px;">
+                Auto-refresh every 30s
+            </p>
+            <button class="refresh-btn" onclick="forceRefresh()">
+                🔄 Refresh Now
+            </button>
         </div>
     </div>
 
@@ -291,6 +480,7 @@
         
         let chart;
         let currentData = {};
+        let isLoading = false;
         
         function initializeChart() {
             const container = document.getElementById('chartContainer');
@@ -301,24 +491,57 @@
             
             // Auto refresh every 30 seconds
             setInterval(loadChartData, 30000);
+            
+            // Add touch feedback
+            addTouchFeedback();
+        }
+        
+        function addTouchFeedback() {
+            // Add haptic feedback for mobile
+            const cards = document.querySelectorAll('.status-card, .refresh-btn');
+            cards.forEach(card => {
+                card.addEventListener('touchstart', () => {
+                    if (navigator.vibrate) {
+                        navigator.vibrate(10); // Light haptic feedback
+                    }
+                });
+            });
         }
         
         async function loadChartData() {
+            if (isLoading) return;
+            isLoading = true;
+            
             try {
-                // Load from Firebase first
+                updateLoadingState(true);
                 await loadFromFirebase();
                 drawChart();
+                updateLoadingState(false);
                 
             } catch (error) {
                 console.error('Error loading data:', error);
                 generateDemoData();
                 drawChart();
+                updateLoadingState(false);
+            }
+            
+            isLoading = false;
+        }
+        
+        function updateLoadingState(loading) {
+            const indicator = document.querySelector('.status-indicator');
+            if (loading) {
+                indicator.style.background = '#ffc107';
+                indicator.style.animation = 'pulse 0.5s infinite';
+            } else {
+                indicator.style.background = '#28a745';
+                indicator.style.animation = 'pulse 2s infinite';
             }
         }
         
         async function loadFromFirebase() {
             try {
-                console.log('Loading from Firebase...');
+                console.log('📱 Loading from Firebase...');
                 
                 // Load kodular_simple data untuk current status
                 const kodularResponse = await fetch('https://predictive-maintenance-90034-default-rtdb.firebaseio.com/kodular_simple.json');
@@ -328,7 +551,7 @@
                 
                 if (kodularResponse.ok) {
                     const kodularData = await kodularResponse.json();
-                    console.log('Kodular data:', kodularData);
+                    console.log('📊 Kodular data:', kodularData);
                     
                     if (kodularData) {
                         currentData.latest = {
@@ -338,7 +561,7 @@
                         };
                         currentData.timestamp = kodularData.time || new Date().toLocaleTimeString();
                         
-                        // Maintenance data
+                        // Maintenance data with days_to_next_zone
                         currentData.maintenance = {
                             next_zone: kodularData.next_zone || 'B',
                             days_to_next_zone: kodularData.days_to_next_zone || 30,
@@ -355,20 +578,18 @@
                 // Load historical data untuk chart
                 if (historyResponse.ok) {
                     const historyData = await historyResponse.json();
-                    console.log('History data:', historyData);
+                    console.log('📈 History data loaded');
                     
                     if (historyData) {
-                        // Convert Firebase historical data ke chart format
                         const chartData = [];
                         const entries = Object.entries(historyData);
                         
-                        // Sort by timestamp dan ambil last 60 points
                         entries.sort((a, b) => a[0].localeCompare(b[0]));
                         const last60 = entries.slice(-60);
                         
                         last60.forEach(([key, data]) => {
                             chartData.push({
-                                time: data.time || '00:00',  // HH:MM format
+                                time: data.time || '00:00',
                                 rms: data.rms || 0,
                                 zone: data.zone || 'A'
                             });
@@ -376,7 +597,7 @@
                         
                         if (chartData.length > 0) {
                             currentData.chartData = chartData;
-                            console.log('Chart data loaded:', chartData.length, 'points');
+                            console.log('📱 Chart data loaded:', chartData.length, 'points');
                         } else {
                             generateChartDataFromCurrent();
                         }
@@ -399,15 +620,14 @@
                 return;
             }
             
-            console.log('Generating chart data from current value:', currentData.latest.rms);
+            console.log('📱 Generating mobile chart data');
             
             const baseRMS = currentData.latest.rms;
             const chartData = [];
             const now = new Date();
             
-            // Generate 60 data points dengan waktu real (mundur 60 menit dari sekarang)
             for (let i = 0; i < 60; i++) {
-                const timeAgo = new Date(now.getTime() - (59 - i) * 60000); // 60 menit mundur
+                const timeAgo = new Date(now.getTime() - (59 - i) * 60000);
                 const variation = Math.sin(i * 0.2) * 0.3 + (Math.random() - 0.5) * 0.2;
                 const rms = Math.max(0.1, baseRMS + variation);
                 
@@ -424,22 +644,21 @@
             }
             
             currentData.chartData = chartData;
-            console.log('Generated chart data:', chartData.length, 'points');
         }
         
         function generateDemoData() {
-            console.log('Generating demo data...');
+            console.log('📱 Generating mobile demo data...');
             
             const demoData = [];
             const now = new Date();
             
             for (let i = 0; i < 60; i++) {
-                const timeAgo = new Date(now.getTime() - (59 - i) * 60000); // 60 menit mundur
+                const timeAgo = new Date(now.getTime() - (59 - i) * 60000);
                 const baseValue = 2.0 + Math.sin(i * 0.1) * 0.5;
                 const noise = (Math.random() - 0.5) * 0.3;
                 const rms = Math.max(0.5, baseValue + noise);
                 
-                let zone = 'B';  // Default Zone B untuk demo
+                let zone = 'B';
                 if (rms < 1.12) zone = 'A';
                 else if (rms < 4.5) zone = 'B';
                 else if (rms < 11.2) zone = 'C';
@@ -475,110 +694,64 @@
                 return;
             }
             
-            console.log('Drawing chart with', currentData.chartData.length, 'points');
+            console.log('📱 Drawing mobile chart');
             
             const data = new google.visualization.DataTable();
-            data.addColumn('string', 'Waktu (HH:MM)');
-            data.addColumn('number', 'RMS Vibration (mm/s)');
+            data.addColumn('string', 'Time');
+            data.addColumn('number', 'RMS (mm/s)');
             data.addColumn({type: 'string', role: 'style'});
             
-            // Add threshold lines sebagai hidden series
-            data.addColumn('number', 'Zone A Max');
-            data.addColumn('number', 'Zone B Max'); 
-            data.addColumn('number', 'Zone C Max');
+            // Simplified for mobile - only show every 5th point
+            const mobileData = currentData.chartData.filter((_, index) => index % 5 === 0);
             
-            currentData.chartData.forEach(point => {
-                let color = '#28a745'; // Green for Zone A
-                let pointSize = 4;
-                
-                if (point.zone === 'B') {
-                    color = '#ffc107';      // Yellow
-                } else if (point.zone === 'C') {
-                    color = '#fd7e14';      // Orange  
-                } else if (point.zone === 'D') {
-                    color = '#dc3545';      // Red
-                    pointSize = 6; // Bigger for critical
-                }
+            mobileData.forEach(point => {
+                let color = '#28a745';
+                if (point.zone === 'B') color = '#ffc107';
+                else if (point.zone === 'C') color = '#fd7e14';
+                else if (point.zone === 'D') color = '#dc3545';
                 
                 data.addRow([
                     point.time, 
                     point.rms, 
-                    `color: ${color}; point-size: ${pointSize}`,
-                    1.12,  // Zone A threshold
-                    4.5,   // Zone B threshold
-                    11.2   // Zone C threshold
+                    `color: ${color}; point-size: 6`
                 ]);
             });
             
             const options = {
-                title: 'Vibration Trend - Last 60 Minutes',
+                title: 'Vibration Trend (1 Hour)',
                 titleTextStyle: {
-                    fontSize: 16,
+                    fontSize: 14,
                     bold: true
                 },
                 hAxis: {
-                    title: 'Waktu (HH:MM)',
-                    titleTextStyle: {fontSize: 12},
+                    title: 'Time',
+                    titleTextStyle: {fontSize: 10},
+                    textStyle: {fontSize: 9},
                     slantedText: true,
                     slantedTextAngle: 45,
-                    showTextEvery: 5
+                    showTextEvery: 2
                 },
                 vAxis: {
-                    title: 'RMS Vibration (mm/s)',
-                    titleTextStyle: {fontSize: 12},
+                    title: 'RMS (mm/s)',
+                    titleTextStyle: {fontSize: 10},
+                    textStyle: {fontSize: 9},
                     minValue: 0,
-                    // Add background colors for zones
                     gridlines: {
                         color: '#e0e0e0',
-                        count: 5
+                        count: 4
                     }
                 },
                 legend: 'none',
-                pointSize: 5,
-                lineWidth: 2,
+                pointSize: 6,
+                lineWidth: 3,
                 backgroundColor: 'transparent',
                 chartArea: {
-                    left: 60,
-                    top: 40,
-                    width: '75%',
-                    height: '70%',
-                    backgroundColor: {
-                        fill: '#f9f9f9',
-                        fillOpacity: 0.1
-                    }
+                    left: 50,
+                    top: 30,
+                    width: '80%',
+                    height: '70%'
                 },
-                colors: ['#007bff', '#28a745', '#ffc107', '#fd7e14'], // Main line + thresholds
-                series: {
-                    0: { // Main vibration line
-                        pointsVisible: true,
-                        pointSize: 4,
-                        lineWidth: 3
-                    },
-                    1: { // Zone A threshold
-                        type: 'line',
-                        lineWidth: 1,
-                        lineDashStyle: [5, 5],
-                        color: '#28a745',
-                        pointsVisible: false,
-                        visibleInLegend: false
-                    },
-                    2: { // Zone B threshold  
-                        type: 'line',
-                        lineWidth: 1,
-                        lineDashStyle: [5, 5], 
-                        color: '#ffc107',
-                        pointsVisible: false,
-                        visibleInLegend: false
-                    },
-                    3: { // Zone C threshold
-                        type: 'line',
-                        lineWidth: 1,
-                        lineDashStyle: [5, 5],
-                        color: '#fd7e14', 
-                        pointsVisible: false,
-                        visibleInLegend: false
-                    }
-                }
+                colors: ['#007bff']
             };
             
             chart.draw(data, options);
@@ -589,20 +762,18 @@
             
             const latest = currentData.latest;
             
-            // Update current values
             document.getElementById('currentRMS').textContent = latest.rms.toFixed(2);
             document.getElementById('currentZone').textContent = latest.zone;
-            document.getElementById('lastUpdate').textContent = currentData.timestamp;
+            document.getElementById('lastUpdate').textContent = currentData.timestamp.slice(0, 5);
             
-            // Determine status text and color
             let status = 'Good';
             let statusClass = 'zone-a';
             
             if (latest.zone === 'B') {
-                status = 'Acceptable';
+                status = 'OK';
                 statusClass = 'zone-b';
             } else if (latest.zone === 'C') {
-                status = 'Caution';
+                status = 'Warning';
                 statusClass = 'zone-c';
             } else if (latest.zone === 'D') {
                 status = 'Critical';
@@ -615,6 +786,12 @@
             
             const zoneElement = document.getElementById('currentZone');
             zoneElement.className = `status-value ${statusClass}`;
+            
+            // Update status cards border colors
+            const cards = document.querySelectorAll('.status-card');
+            cards.forEach(card => {
+                card.style.borderColor = getZoneColor(latest.zone);
+            });
         }
         
         function updateMaintenancePrediction() {
@@ -628,7 +805,6 @@
             else if (maintenance.urgency === 'HIGH') urgencyClass = 'zone-c';
             else if (maintenance.urgency === 'URGENT') urgencyClass = 'zone-d';
             
-            // Show predictions dengan color coding
             const predHTML = `
                 <div class="pred-item">
                     <div class="pred-time">Current Status</div>
@@ -638,21 +814,21 @@
                     <div class="pred-desc">Current condition</div>
                 </div>
                 <div class="pred-item">
-                    <div class="pred-time">Next Zone Prediction</div>
-                    <div class="pred-value ${getZoneClass(maintenance.next_zone)}">Zone ${maintenance.next_zone}</div>
-                    <div class="pred-desc">Expected in ${maintenance.days_to_next_zone} days</div>
+                    <div class="pred-time">Days to Zone ${maintenance.next_zone}</div>
+                    <div class="pred-value ${getZoneClass(maintenance.next_zone)}">${maintenance.days_to_next_zone}</div>
+                    <div class="pred-desc">Days remaining</div>
                 </div>
                 <div class="pred-item">
-                    <div class="pred-time">Urgency Level</div>
+                    <div class="pred-time">Priority Level</div>
                     <div class="pred-value ${urgencyClass}">${maintenance.urgency}</div>
-                    <div class="pred-desc">Maintenance priority</div>
+                    <div class="pred-desc">Maintenance urgency</div>
                 </div>
                 <div class="pred-item">
                     <div class="pred-time">Trend Analysis</div>
                     <div class="pred-value">
-                        ${currentData.latest && currentData.latest.rms > 2.5 ? 'Increasing' : 'Stable'}
+                        ${currentData.latest && currentData.latest.rms > 2.5 ? '📈 Rising' : '📊 Stable'}
                     </div>
-                    <div class="pred-desc">Based on recent data</div>
+                    <div class="pred-desc">Recent pattern</div>
                 </div>
             `;
             
@@ -680,15 +856,28 @@
             }
         }
         
+        function getZoneColor(zone) {
+            switch(zone) {
+                case 'A': return '#28a745';
+                case 'B': return '#ffc107';
+                case 'C': return '#fd7e14';
+                case 'D': return '#dc3545';
+                default: return '#28a745';
+            }
+        }
+        
         function forceRefresh() {
-            console.log('Force refresh triggered');
+            console.log('📱 Force refresh triggered');
+            if (navigator.vibrate) {
+                navigator.vibrate([10, 50, 10]); // Pattern vibration
+            }
             loadChartData();
         }
         
         // Handle real-time updates dari Kodular
         function updateFromKodular(kodularData) {
             if (kodularData) {
-                console.log('Update from Kodular:', kodularData);
+                console.log('📱 Update from Kodular:', kodularData);
                 
                 currentData.latest = {
                     rms: kodularData.rms || 0,
@@ -709,11 +898,45 @@
                 updateStatusDisplay();
                 updateMaintenancePrediction();
                 drawChart();
+                
+                // Show notification for critical status
+                if (kodularData.zone === 'D' && 'Notification' in window) {
+                    new Notification('🚨 Critical Vibration Alert!', {
+                        body: `RMS: ${kodularData.rms} mm/s - Immediate action required`,
+                        icon: '/favicon.ico'
+                    });
+                }
             }
+        }
+        
+        // Request notification permission on load
+        if ('Notification' in window && Notification.permission === 'default') {
+            Notification.requestPermission();
+        }
+        
+        // Service Worker for offline support
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/sw.js').catch(console.error);
         }
         
         // Expose for Kodular
         window.updateFromKodular = updateFromKodular;
+        
+        // Handle orientation change
+        window.addEventListener('orientationchange', () => {
+            setTimeout(() => {
+                if (chart) {
+                    chart.draw(chart.getDataTable(), chart.getOptions());
+                }
+            }, 500);
+        });
+        
+        // Handle visibility change (app comes back to foreground)
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden) {
+                forceRefresh();
+            }
+        });
     </script>
 </body>
 </html>
