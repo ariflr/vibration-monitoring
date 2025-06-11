@@ -211,39 +211,74 @@
         
         async function loadFromFirebase() {
             try {
-                // Load kodular_simple data
-                const response = await fetch('https://predictive-maintenance-90034-default-rtdb.firebaseio.com/kodular_simple.json');
+                console.log('Loading from Firebase...');
                 
-                if (response.ok) {
-                    const data = await response.json();
+                // Load kodular_simple data untuk current status
+                const kodularResponse = await fetch('https://predictive-maintenance-90034-default-rtdb.firebaseio.com/kodular_simple.json');
+                
+                // Load historical RMS data untuk chart
+                const historyResponse = await fetch('https://predictive-maintenance-90034-default-rtdb.firebaseio.com/realtime/historical_rms.json');
+                
+                if (kodularResponse.ok) {
+                    const kodularData = await kodularResponse.json();
+                    console.log('Kodular data:', kodularData);
                     
-                    if (data) {
-                        currentData = {
-                            latest: {
-                                rms: data.rms || 0,
-                                zone: data.zone || 'A',
-                                status: data.status || 'Good'
-                            },
-                            timestamp: data.time || new Date().toLocaleTimeString(),
-                            maintenance: {
-                                next_zone: data.next_zone || 'B',
-                                days_to_next_zone: data.days_to_next_zone || 30,
-                                maintenance_advice: data.maintenance_advice || 'Regular maintenance',
-                                urgency: data.urgency || 'LOW',
-                                urgency_color: data.urgency_color || 'green'
-                            }
+                    if (kodularData) {
+                        currentData.latest = {
+                            rms: kodularData.rms || 0,
+                            zone: kodularData.zone || 'A',
+                            status: kodularData.status || 'Good'
+                        };
+                        currentData.timestamp = kodularData.time || new Date().toLocaleTimeString();
+                        
+                        // Maintenance data
+                        currentData.maintenance = {
+                            next_zone: kodularData.next_zone || 'B',
+                            days_to_next_zone: kodularData.days_to_next_zone || 30,
+                            maintenance_advice: kodularData.maintenance_advice || 'Regular maintenance',
+                            urgency: kodularData.urgency || 'LOW',
+                            urgency_color: kodularData.urgency_color || 'green'
                         };
                         
-                        // Generate chart data based on current value
-                        generateChartDataFromCurrent();
                         updateStatusDisplay();
                         updateMaintenancePrediction();
-                        return;
                     }
                 }
                 
-                // Fallback to demo data
-                generateDemoData();
+                // Load historical data untuk chart
+                if (historyResponse.ok) {
+                    const historyData = await historyResponse.json();
+                    console.log('History data:', historyData);
+                    
+                    if (historyData) {
+                        // Convert Firebase historical data ke chart format
+                        const chartData = [];
+                        const entries = Object.entries(historyData);
+                        
+                        // Sort by timestamp dan ambil last 60 points
+                        entries.sort((a, b) => a[0].localeCompare(b[0]));
+                        const last60 = entries.slice(-60);
+                        
+                        last60.forEach(([key, data]) => {
+                            chartData.push({
+                                time: data.time || '00:00',  // HH:MM format
+                                rms: data.rms || 0,
+                                zone: data.zone || 'A'
+                            });
+                        });
+                        
+                        if (chartData.length > 0) {
+                            currentData.chartData = chartData;
+                            console.log('Chart data loaded:', chartData.length, 'points');
+                        } else {
+                            generateChartDataFromCurrent();
+                        }
+                    } else {
+                        generateChartDataFromCurrent();
+                    }
+                } else {
+                    generateChartDataFromCurrent();
+                }
                 
             } catch (error) {
                 console.error('Firebase load error:', error);
@@ -257,11 +292,15 @@
                 return;
             }
             
+            console.log('Generating chart data from current value:', currentData.latest.rms);
+            
             const baseRMS = currentData.latest.rms;
             const chartData = [];
+            const now = new Date();
             
-            // Generate 60 data points around current value
+            // Generate 60 data points dengan waktu real (mundur 60 menit dari sekarang)
             for (let i = 0; i < 60; i++) {
+                const timeAgo = new Date(now.getTime() - (59 - i) * 60000); // 60 menit mundur
                 const variation = Math.sin(i * 0.2) * 0.3 + (Math.random() - 0.5) * 0.2;
                 const rms = Math.max(0.1, baseRMS + variation);
                 
@@ -271,30 +310,36 @@
                 if (rms >= 11.2) zone = 'D';
                 
                 chartData.push({
-                    time: i,
+                    time: timeAgo.getHours().toString().padStart(2, '0') + ':' + timeAgo.getMinutes().toString().padStart(2, '0'),
                     rms: Math.round(rms * 100) / 100,
                     zone: zone
                 });
             }
             
             currentData.chartData = chartData;
+            console.log('Generated chart data:', chartData.length, 'points');
         }
         
         function generateDemoData() {
+            console.log('Generating demo data...');
+            
             const demoData = [];
+            const now = new Date();
+            
             for (let i = 0; i < 60; i++) {
+                const timeAgo = new Date(now.getTime() - (59 - i) * 60000); // 60 menit mundur
                 const baseValue = 2.0 + Math.sin(i * 0.1) * 0.5;
                 const noise = (Math.random() - 0.5) * 0.3;
                 const rms = Math.max(0.5, baseValue + noise);
                 
-                let zone = 'C';
+                let zone = 'B';  // Default Zone B untuk demo
                 if (rms < 1.12) zone = 'A';
                 else if (rms < 4.5) zone = 'B';
                 else if (rms < 11.2) zone = 'C';
                 else zone = 'D';
                 
                 demoData.push({
-                    time: i,
+                    time: timeAgo.getHours().toString().padStart(2, '0') + ':' + timeAgo.getMinutes().toString().padStart(2, '0'),
                     rms: Math.round(rms * 100) / 100,
                     zone: zone
                 });
@@ -305,10 +350,10 @@
                 latest: demoData[demoData.length - 1],
                 timestamp: new Date().toLocaleTimeString(),
                 maintenance: {
-                    next_zone: 'D',
-                    days_to_next_zone: 15.3,
-                    maintenance_advice: 'Perawatan segera dalam 2 minggu',
-                    urgency: 'HIGH',
+                    next_zone: 'C',
+                    days_to_next_zone: 30,
+                    maintenance_advice: 'Perawatan preventif dalam 1 bulan',
+                    urgency: 'MEDIUM',
                     urgency_color: 'orange'
                 }
             };
@@ -319,11 +364,14 @@
         
         function drawChart() {
             if (!currentData.chartData || currentData.chartData.length === 0) {
+                console.log('No chart data to draw');
                 return;
             }
             
+            console.log('Drawing chart with', currentData.chartData.length, 'points');
+            
             const data = new google.visualization.DataTable();
-            data.addColumn('number', 'Time (minutes)');
+            data.addColumn('string', 'Waktu (HH:MM)');  // String untuk waktu HH:MM
             data.addColumn('number', 'RMS Vibration (mm/s)');
             data.addColumn({type: 'string', role: 'style'});
             
@@ -337,14 +385,17 @@
             });
             
             const options = {
-                title: 'Vibration Trend - Last 60 Samples',
+                title: 'Vibration Trend - Last 60 Minutes',  // Update title
                 titleTextStyle: {
                     fontSize: 16,
                     bold: true
                 },
                 hAxis: {
-                    title: 'Time (minutes)',
-                    titleTextStyle: {fontSize: 12}
+                    title: 'Waktu (HH:MM)',  // Update axis title
+                    titleTextStyle: {fontSize: 12},
+                    slantedText: true,       // Miringkan text waktu
+                    slantedTextAngle: 45,    // Sudut 45 derajat
+                    showTextEvery: 5         // Tampilkan setiap 5 label aja biar ga terlalu rapat
                 },
                 vAxis: {
                     title: 'RMS Vibration (mm/s)',
@@ -358,7 +409,7 @@
                 chartArea: {
                     left: 60,
                     top: 40,
-                    width: '80%',
+                    width: '75%',    // Sedikit lebih kecil untuk waktu yang miring
                     height: '70%'
                 },
                 colors: ['#007bff'],
@@ -450,26 +501,28 @@
         }
         
         function forceRefresh() {
-            location.reload();
+            console.log('Force refresh triggered');
+            loadChartData();
         }
         
         // Handle real-time updates dari Kodular
         function updateFromKodular(kodularData) {
             if (kodularData) {
-                currentData = {
-                    latest: {
-                        rms: kodularData.rms || 0,
-                        zone: kodularData.zone || 'A',
-                        status: kodularData.status || 'Good'
-                    },
-                    timestamp: kodularData.time || new Date().toLocaleTimeString(),
-                    maintenance: {
-                        next_zone: kodularData.next_zone || 'B',
-                        days_to_next_zone: kodularData.days_to_next_zone || 30,
-                        maintenance_advice: kodularData.maintenance_advice || 'Regular maintenance',
-                        urgency: kodularData.urgency || 'LOW',
-                        urgency_color: kodularData.urgency_color || 'green'
-                    }
+                console.log('Update from Kodular:', kodularData);
+                
+                currentData.latest = {
+                    rms: kodularData.rms || 0,
+                    zone: kodularData.zone || 'A',
+                    status: kodularData.status || 'Good'
+                };
+                currentData.timestamp = kodularData.time || new Date().toLocaleTimeString();
+                
+                currentData.maintenance = {
+                    next_zone: kodularData.next_zone || 'B',
+                    days_to_next_zone: kodularData.days_to_next_zone || 30,
+                    maintenance_advice: kodularData.maintenance_advice || 'Regular maintenance',
+                    urgency: kodularData.urgency || 'LOW',
+                    urgency_color: kodularData.urgency_color || 'green'
                 };
                 
                 generateChartDataFromCurrent();
