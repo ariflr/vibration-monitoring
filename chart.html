@@ -478,36 +478,60 @@
             console.log('Drawing chart with', currentData.chartData.length, 'points');
             
             const data = new google.visualization.DataTable();
-            data.addColumn('string', 'Waktu (HH:MM)');  // String untuk waktu HH:MM
+            data.addColumn('string', 'Waktu (HH:MM)');
             data.addColumn('number', 'RMS Vibration (mm/s)');
             data.addColumn({type: 'string', role: 'style'});
             
+            // Add threshold lines sebagai hidden series
+            data.addColumn('number', 'Zone A Max');
+            data.addColumn('number', 'Zone B Max'); 
+            data.addColumn('number', 'Zone C Max');
+            
             currentData.chartData.forEach(point => {
                 let color = '#28a745'; // Green for Zone A
-                if (point.zone === 'B') color = '#ffc107';      // Yellow
-                else if (point.zone === 'C') color = '#fd7e14';  // Orange  
-                else if (point.zone === 'D') color = '#dc3545';  // Red
+                let pointSize = 4;
                 
-                data.addRow([point.time, point.rms, `color: ${color}`]);
+                if (point.zone === 'B') {
+                    color = '#ffc107';      // Yellow
+                } else if (point.zone === 'C') {
+                    color = '#fd7e14';      // Orange  
+                } else if (point.zone === 'D') {
+                    color = '#dc3545';      // Red
+                    pointSize = 6; // Bigger for critical
+                }
+                
+                data.addRow([
+                    point.time, 
+                    point.rms, 
+                    `color: ${color}; point-size: ${pointSize}`,
+                    1.12,  // Zone A threshold
+                    4.5,   // Zone B threshold
+                    11.2   // Zone C threshold
+                ]);
             });
             
             const options = {
-                title: 'Vibration Trend - Last 60 Minutes',  // Update title
+                title: 'Vibration Trend - Last 60 Minutes',
                 titleTextStyle: {
                     fontSize: 16,
                     bold: true
                 },
                 hAxis: {
-                    title: 'Waktu (HH:MM)',  // Update axis title
+                    title: 'Waktu (HH:MM)',
                     titleTextStyle: {fontSize: 12},
-                    slantedText: true,       // Miringkan text waktu
-                    slantedTextAngle: 45,    // Sudut 45 derajat
-                    showTextEvery: 5         // Tampilkan setiap 5 label aja biar ga terlalu rapat
+                    slantedText: true,
+                    slantedTextAngle: 45,
+                    showTextEvery: 5
                 },
                 vAxis: {
                     title: 'RMS Vibration (mm/s)',
                     titleTextStyle: {fontSize: 12},
-                    minValue: 0
+                    minValue: 0,
+                    // Add background colors for zones
+                    gridlines: {
+                        color: '#e0e0e0',
+                        count: 5
+                    }
                 },
                 legend: 'none',
                 pointSize: 5,
@@ -516,14 +540,43 @@
                 chartArea: {
                     left: 60,
                     top: 40,
-                    width: '75%',    // Sedikit lebih kecil untuk waktu yang miring
-                    height: '70%'
+                    width: '75%',
+                    height: '70%',
+                    backgroundColor: {
+                        fill: '#f9f9f9',
+                        fillOpacity: 0.1
+                    }
                 },
-                colors: ['#007bff'],
+                colors: ['#007bff', '#28a745', '#ffc107', '#fd7e14'], // Main line + thresholds
                 series: {
-                    0: {
+                    0: { // Main vibration line
                         pointsVisible: true,
-                        pointSize: 4
+                        pointSize: 4,
+                        lineWidth: 3
+                    },
+                    1: { // Zone A threshold
+                        type: 'line',
+                        lineWidth: 1,
+                        lineDashStyle: [5, 5],
+                        color: '#28a745',
+                        pointsVisible: false,
+                        visibleInLegend: false
+                    },
+                    2: { // Zone B threshold  
+                        type: 'line',
+                        lineWidth: 1,
+                        lineDashStyle: [5, 5], 
+                        color: '#ffc107',
+                        pointsVisible: false,
+                        visibleInLegend: false
+                    },
+                    3: { // Zone C threshold
+                        type: 'line',
+                        lineWidth: 1,
+                        lineDashStyle: [5, 5],
+                        color: '#fd7e14', 
+                        pointsVisible: false,
+                        visibleInLegend: false
                     }
                 }
             };
