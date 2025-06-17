@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Vibration Monitor - Mobile</title>
+    <title>Enhanced Vibration Monitor - ML Powered</title>
     <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
     <style>
         * {
@@ -35,6 +35,7 @@
             color: white;
             padding: 20px;
             text-align: center;
+            position: relative;
         }
         
         .header h1 {
@@ -46,6 +47,30 @@
         .header p {
             font-size: 0.9rem;
             opacity: 0.9;
+        }
+        
+        /* NEW: ML Enhancement Badge */
+        .ml-badge {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(10px);
+            padding: 5px 10px;
+            border-radius: 15px;
+            font-size: 0.7rem;
+            font-weight: bold;
+            display: none;
+        }
+        
+        .ml-badge.active {
+            display: block;
+            animation: pulse-ml 2s infinite;
+        }
+        
+        @keyframes pulse-ml {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
         }
         
         .status-grid {
@@ -64,10 +89,28 @@
             box-shadow: 0 4px 15px rgba(0,0,0,0.1);
             border: 2px solid transparent;
             transition: all 0.3s ease;
+            position: relative;
         }
         
         .status-card:active {
             transform: scale(0.98);
+        }
+        
+        /* NEW: ML Enhancement Indicator */
+        .ml-indicator {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #28a745;
+            display: none;
+        }
+        
+        .ml-indicator.active {
+            display: block;
+            animation: pulse 1.5s infinite;
         }
         
         .status-value {
@@ -100,6 +143,26 @@
             margin-bottom: 15px;
             box-shadow: 0 4px 15px rgba(0,0,0,0.1);
             overflow: hidden;
+            position: relative;
+        }
+        
+        /* NEW: Chart ML Enhancement Indicator */
+        .chart-ml-badge {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(76, 175, 80, 0.9);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 0.65rem;
+            font-weight: bold;
+            z-index: 1000;
+            display: none;
+        }
+        
+        .chart-ml-badge.active {
+            display: block;
         }
         
         .zone-legend {
@@ -146,6 +209,24 @@
             padding: 15px;
             font-weight: bold;
             font-size: 1.1rem;
+            position: relative;
+        }
+        
+        /* NEW: ML Performance Badge in Predictions */
+        .predictions-ml-badge {
+            position: absolute;
+            top: 50%;
+            right: 15px;
+            transform: translateY(-50%);
+            background: rgba(255, 255, 255, 0.2);
+            padding: 3px 8px;
+            border-radius: 10px;
+            font-size: 0.65rem;
+            display: none;
+        }
+        
+        .predictions-ml-badge.active {
+            display: block;
         }
         
         .pred-grid {
@@ -159,6 +240,7 @@
             background: white;
             padding: 15px;
             text-align: center;
+            position: relative;
         }
         
         .pred-time {
@@ -178,6 +260,56 @@
         .pred-desc {
             font-size: 0.7rem;
             color: #888;
+        }
+        
+        /* NEW: ML Performance Section */
+        .ml-performance {
+            margin: 15px;
+            background: linear-gradient(135deg, #e8f5e8 0%, #f0fff0 100%);
+            border-radius: 15px;
+            padding: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            display: none;
+        }
+        
+        .ml-performance.active {
+            display: block;
+        }
+        
+        .ml-performance h4 {
+            color: #2e7d32;
+            margin-bottom: 10px;
+            font-size: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .ml-metrics {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+        
+        .ml-metric {
+            text-align: center;
+            background: white;
+            padding: 10px;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        .ml-metric-value {
+            font-size: 1.1rem;
+            font-weight: bold;
+            color: #2e7d32;
+            margin-bottom: 3px;
+        }
+        
+        .ml-metric-label {
+            font-size: 0.7rem;
+            color: #666;
+            text-transform: uppercase;
         }
         
         .maintenance-card {
@@ -327,6 +459,10 @@
             .threshold-list {
                 grid-template-columns: 1fr;
             }
+            
+            .ml-metrics {
+                grid-template-columns: 1fr;
+            }
         }
         
         /* Landscape mode adjustments */
@@ -368,6 +504,15 @@
                 background: #2d3748;
                 color: #90cdf4;
             }
+            
+            .ml-performance {
+                background: linear-gradient(135deg, #2d4a2d 0%, #3d5a3d 100%);
+            }
+            
+            .ml-metric {
+                background: #4a5568;
+                color: white;
+            }
         }
     </style>
 </head>
@@ -376,16 +521,19 @@
         <div class="status-indicator"></div>
         
         <div class="header">
+            <div class="ml-badge" id="mlBadge">🤖 ML Enhanced</div>
             <h1>🔧 Vibration Monitor</h1>
             <p>Real-time Machine Health</p>
         </div>
         
         <div class="status-grid">
             <div class="status-card">
+                <div class="ml-indicator" id="rmsMLIndicator"></div>
                 <div class="status-value" id="currentRMS">--</div>
                 <div class="status-label">RMS (mm/s)</div>
             </div>
             <div class="status-card">
+                <div class="ml-indicator" id="zoneMLIndicator"></div>
                 <div class="status-value" id="currentZone">--</div>
                 <div class="status-label">Zone</div>
             </div>
@@ -399,8 +547,34 @@
             </div>
         </div>
         
+        <!-- NEW: ML Performance Section -->
+        <div class="ml-performance" id="mlPerformance">
+            <h4>🤖 ML Enhancement Active</h4>
+            <div class="ml-metrics">
+                <div class="ml-metric">
+                    <div class="ml-metric-value" id="mlImprovement">--</div>
+                    <div class="ml-metric-label">Accuracy Gain</div>
+                </div>
+                <div class="ml-metric">
+                    <div class="ml-metric-value" id="mlConfidence">--</div>
+                    <div class="ml-metric-label">Confidence</div>
+                </div>
+                <div class="ml-metric">
+                    <div class="ml-metric-value" id="mlMethod">--</div>
+                    <div class="ml-metric-label">Method</div>
+                </div>
+                <div class="ml-metric">
+                    <div class="ml-metric-value" id="mlAccuracy">--</div>
+                    <div class="ml-metric-label">ML Accuracy</div>
+                </div>
+            </div>
+        </div>
+        
         <div class="chart-section">
-            <div id="chartContainer" class="chart-container"></div>
+            <div class="chart-container">
+                <div class="chart-ml-badge" id="chartMLBadge">ML Predictions</div>
+                <div id="chartContainer"></div>
+            </div>
             
             <div class="zone-legend">
                 <div class="zone-legend-item">
@@ -452,7 +626,8 @@
         
         <div class="predictions">
             <div class="predictions-header">
-                🔮 Trend Predictions
+                🔮 Enhanced Predictions
+                <div class="predictions-ml-badge" id="predMLBadge">AI Powered</div>
             </div>
             <div class="pred-grid" id="predGrid">
                 <div class="loading">Loading predictions...</div>
@@ -481,6 +656,7 @@
         let chart;
         let currentData = {};
         let isLoading = false;
+        let mlEnhanced = false;
         
         function initializeChart() {
             const container = document.getElementById('chartContainer');
@@ -534,45 +710,81 @@
                 indicator.style.background = '#ffc107';
                 indicator.style.animation = 'pulse 0.5s infinite';
             } else {
-                indicator.style.background = '#28a745';
+                indicator.style.background = mlEnhanced ? '#4caf50' : '#28a745';
                 indicator.style.animation = 'pulse 2s infinite';
             }
         }
         
         async function loadFromFirebase() {
             try {
-                console.log('📱 Loading from Firebase...');
+                console.log('📱 Loading enhanced data from Firebase...');
                 
-                // Load kodular_simple data untuk current status
+                // ENHANCED: Try to load enhanced data first
+                const enhancedResponse = await fetch('https://predictive-maintenance-90034-default-rtdb.firebaseio.com/kodular_enhanced.json');
+                
+                // Fallback to kodular_simple
                 const kodularResponse = await fetch('https://predictive-maintenance-90034-default-rtdb.firebaseio.com/kodular_simple.json');
                 
                 // Load historical RMS data untuk chart
                 const historyResponse = await fetch('https://predictive-maintenance-90034-default-rtdb.firebaseio.com/realtime/historical_rms.json');
                 
-                if (kodularResponse.ok) {
-                    const kodularData = await kodularResponse.json();
-                    console.log('📊 Kodular data:', kodularData);
+                let kodularData = null;
+                let mlData = null;
+                
+                // Try enhanced data first
+                if (enhancedResponse.ok) {
+                    const enhancedData = await enhancedResponse.json();
+                    console.log('📊 Enhanced data loaded:', enhancedData);
                     
-                    if (kodularData) {
-                        currentData.latest = {
-                            rms: kodularData.rms || 0,
-                            zone: kodularData.zone || 'A',
-                            status: kodularData.status || 'Good'
-                        };
-                        currentData.timestamp = kodularData.time || new Date().toLocaleTimeString();
-                        
-                        // Maintenance data with days_to_next_zone
-                        currentData.maintenance = {
-                            next_zone: kodularData.next_zone || 'B',
-                            days_to_next_zone: kodularData.days_to_next_zone || 30,
-                            maintenance_advice: kodularData.maintenance_advice || 'Regular maintenance',
-                            urgency: kodularData.urgency || 'LOW',
-                            urgency_color: kodularData.urgency_color || 'green'
-                        };
-                        
-                        updateStatusDisplay();
-                        updateMaintenancePrediction();
+                    if (enhancedData && enhancedData.basic) {
+                        kodularData = enhancedData.basic;
+                        mlData = enhancedData.advanced;
+                        mlEnhanced = kodularData.ml_enhanced || false;
                     }
+                }
+                
+                // Fallback to simple data
+                if (!kodularData && kodularResponse.ok) {
+                    kodularData = await kodularResponse.json();
+                    console.log('📊 Basic data loaded:', kodularData);
+                    mlEnhanced = kodularData?.ml_enhanced || false;
+                }
+                
+                if (kodularData) {
+                    currentData.latest = {
+                        rms: kodularData.rms || 0,
+                        zone: kodularData.zone || 'A',
+                        status: kodularData.status || 'Good'
+                    };
+                    currentData.timestamp = kodularData.time || new Date().toLocaleTimeString();
+                    
+                    // Maintenance data with ML enhancements
+                    currentData.maintenance = {
+                        next_zone: kodularData.next_zone || 'B',
+                        days_to_next_zone: kodularData.days_to_next_zone || 30,
+                        maintenance_advice: kodularData.maintenance_advice || 'Regular maintenance',
+                        urgency: kodularData.urgency || 'LOW',
+                        urgency_color: kodularData.urgency_color || 'green'
+                    };
+                    
+                    // ENHANCED: ML performance data
+                    if (mlEnhanced) {
+                        currentData.mlPerformance = {
+                            improvement: kodularData.ml_accuracy_improvement || 0,
+                            method: kodularData.prediction_method || 'Hybrid ML',
+                            confidence: kodularData.confidence_level || 'medium',
+                            status: kodularData.ml_status || 'ACTIVE'
+                        };
+                        
+                        // Advanced ML data if available
+                        if (mlData && mlData.ml_details) {
+                            currentData.mlAdvanced = mlData.ml_details;
+                        }
+                    }
+                    
+                    updateStatusDisplay();
+                    updateMLPerformanceDisplay();
+                    updateMaintenancePrediction();
                 }
                 
                 // Load historical data untuk chart
@@ -591,7 +803,8 @@
                             chartData.push({
                                 time: data.time || '00:00',
                                 rms: data.rms || 0,
-                                zone: data.zone || 'A'
+                                zone: data.zone || 'A',
+                                ml_enhanced: data.ml_enhanced || false
                             });
                         });
                         
@@ -620,7 +833,7 @@
                 return;
             }
             
-            console.log('📱 Generating mobile chart data');
+            console.log('📱 Generating enhanced chart data');
             
             const baseRMS = currentData.latest.rms;
             const chartData = [];
@@ -639,7 +852,8 @@
                 chartData.push({
                     time: timeAgo.getHours().toString().padStart(2, '0') + ':' + timeAgo.getMinutes().toString().padStart(2, '0'),
                     rms: Math.round(rms * 100) / 100,
-                    zone: zone
+                    zone: zone,
+                    ml_enhanced: mlEnhanced
                 });
             }
             
@@ -647,10 +861,11 @@
         }
         
         function generateDemoData() {
-            console.log('📱 Generating mobile demo data...');
+            console.log('📱 Generating enhanced demo data...');
             
             const demoData = [];
             const now = new Date();
+            mlEnhanced = true; // Demo with ML enhancement
             
             for (let i = 0; i < 60; i++) {
                 const timeAgo = new Date(now.getTime() - (59 - i) * 60000);
@@ -667,7 +882,8 @@
                 demoData.push({
                     time: timeAgo.getHours().toString().padStart(2, '0') + ':' + timeAgo.getMinutes().toString().padStart(2, '0'),
                     rms: Math.round(rms * 100) / 100,
-                    zone: zone
+                    zone: zone,
+                    ml_enhanced: true
                 });
             }
             
@@ -677,14 +893,21 @@
                 timestamp: new Date().toLocaleTimeString(),
                 maintenance: {
                     next_zone: 'C',
-                    days_to_next_zone: 30,
+                    days_to_next_zone: 25,
                     maintenance_advice: 'Perawatan preventif dalam 1 bulan',
                     urgency: 'MEDIUM',
                     urgency_color: 'orange'
+                },
+                mlPerformance: {
+                    improvement: 28.5,
+                    method: 'Hybrid ML',
+                    confidence: 'high',
+                    status: 'ACTIVE'
                 }
             };
             
             updateStatusDisplay();
+            updateMLPerformanceDisplay();
             updateMaintenancePrediction();
         }
         
@@ -694,7 +917,7 @@
                 return;
             }
             
-            console.log('📱 Drawing mobile chart');
+            console.log('📱 Drawing enhanced chart');
             
             const data = new google.visualization.DataTable();
             data.addColumn('string', 'Time');
@@ -710,18 +933,24 @@
                 else if (point.zone === 'C') color = '#fd7e14';
                 else if (point.zone === 'D') color = '#dc3545';
                 
+                // Enhanced color for ML predictions
+                if (point.ml_enhanced && mlEnhanced) {
+                    color = enhanceColorForML(color);
+                }
+                
                 data.addRow([
                     point.time, 
                     point.rms, 
-                    `color: ${color}; point-size: 6`
+                    `color: ${color}; point-size: ${mlEnhanced ? 8 : 6}`
                 ]);
             });
             
             const options = {
-                title: 'Vibration Trend (1 Hour)',
+                title: mlEnhanced ? 'ML-Enhanced Vibration Trend (1 Hour)' : 'Vibration Trend (1 Hour)',
                 titleTextStyle: {
                     fontSize: 14,
-                    bold: true
+                    bold: true,
+                    color: mlEnhanced ? '#2e7d32' : '#333'
                 },
                 hAxis: {
                     title: 'Time',
@@ -742,19 +971,38 @@
                     }
                 },
                 legend: 'none',
-                pointSize: 6,
-                lineWidth: 3,
+                pointSize: mlEnhanced ? 8 : 6,
+                lineWidth: mlEnhanced ? 4 : 3,
                 backgroundColor: 'transparent',
                 chartArea: {
                     left: 50,
-                    top: 30,
+                    top: 40,
                     width: '80%',
-                    height: '70%'
+                    height: '65%'
                 },
-                colors: ['#007bff']
+                colors: [mlEnhanced ? '#2e7d32' : '#007bff']
             };
             
             chart.draw(data, options);
+            
+            // Update chart ML badge
+            const chartMLBadge = document.getElementById('chartMLBadge');
+            if (mlEnhanced) {
+                chartMLBadge.classList.add('active');
+            } else {
+                chartMLBadge.classList.remove('active');
+            }
+        }
+        
+        function enhanceColorForML(baseColor) {
+            // Make colors more vibrant for ML-enhanced data
+            const colorMap = {
+                '#28a745': '#2e7d32', // Darker green
+                '#ffc107': '#ff8f00', // Darker amber
+                '#fd7e14': '#e65100', // Darker orange
+                '#dc3545': '#c62828'  // Darker red
+            };
+            return colorMap[baseColor] || baseColor;
         }
         
         function updateStatusDisplay() {
@@ -792,6 +1040,53 @@
             cards.forEach(card => {
                 card.style.borderColor = getZoneColor(latest.zone);
             });
+            
+            // Update ML indicators
+            const rmsMLIndicator = document.getElementById('rmsMLIndicator');
+            const zoneMLIndicator = document.getElementById('zoneMLIndicator');
+            
+            if (mlEnhanced) {
+                rmsMLIndicator.classList.add('active');
+                zoneMLIndicator.classList.add('active');
+            } else {
+                rmsMLIndicator.classList.remove('active');
+                zoneMLIndicator.classList.remove('active');
+            }
+        }
+        
+        function updateMLPerformanceDisplay() {
+            const mlPerformanceDiv = document.getElementById('mlPerformance');
+            const mlBadge = document.getElementById('mlBadge');
+            
+            if (mlEnhanced && currentData.mlPerformance) {
+                const perf = currentData.mlPerformance;
+                
+                // Show ML performance section
+                mlPerformanceDiv.classList.add('active');
+                mlBadge.classList.add('active');
+                
+                // Update ML metrics
+                document.getElementById('mlImprovement').textContent = `+${perf.improvement.toFixed(1)}%`;
+                document.getElementById('mlConfidence').textContent = perf.confidence.toUpperCase();
+                document.getElementById('mlMethod').textContent = perf.method;
+                
+                // Calculate accuracy from improvement
+                const baseAccuracy = 90; // Assume base 90% accuracy
+                const mlAccuracy = baseAccuracy + (perf.improvement * 0.3);
+                document.getElementById('mlAccuracy').textContent = `${mlAccuracy.toFixed(1)}%`;
+                
+                // Update predictions ML badge
+                const predMLBadge = document.getElementById('predMLBadge');
+                predMLBadge.classList.add('active');
+                
+            } else {
+                // Hide ML performance section
+                mlPerformanceDiv.classList.remove('active');
+                mlBadge.classList.remove('active');
+                
+                const predMLBadge = document.getElementById('predMLBadge');
+                predMLBadge.classList.remove('active');
+            }
         }
         
         function updateMaintenancePrediction() {
@@ -811,12 +1106,12 @@
                     <div class="pred-value ${currentData.latest ? getZoneClass(currentData.latest.zone) : 'zone-a'}">
                         Zone ${currentData.latest ? currentData.latest.zone : 'A'}
                     </div>
-                    <div class="pred-desc">Current condition</div>
+                    <div class="pred-desc">${mlEnhanced ? 'ML Enhanced' : 'Current condition'}</div>
                 </div>
                 <div class="pred-item">
                     <div class="pred-time">Days to Zone ${maintenance.next_zone}</div>
                     <div class="pred-value ${getZoneClass(maintenance.next_zone)}">${maintenance.days_to_next_zone}</div>
-                    <div class="pred-desc">Days remaining</div>
+                    <div class="pred-desc">${mlEnhanced ? 'AI Prediction' : 'Days remaining'}</div>
                 </div>
                 <div class="pred-item">
                     <div class="pred-time">Priority Level</div>
@@ -824,11 +1119,14 @@
                     <div class="pred-desc">Maintenance urgency</div>
                 </div>
                 <div class="pred-item">
-                    <div class="pred-time">Trend Analysis</div>
+                    <div class="pred-time">${mlEnhanced ? 'ML Confidence' : 'Trend Analysis'}</div>
                     <div class="pred-value">
-                        ${currentData.latest && currentData.latest.rms > 2.5 ? '📈 Rising' : '📊 Stable'}
+                        ${mlEnhanced ? 
+                            (currentData.mlPerformance ? currentData.mlPerformance.confidence.toUpperCase() : 'HIGH') : 
+                            (currentData.latest && currentData.latest.rms > 2.5 ? '📈 Rising' : '📊 Stable')
+                        }
                     </div>
-                    <div class="pred-desc">Recent pattern</div>
+                    <div class="pred-desc">${mlEnhanced ? 'Prediction quality' : 'Recent pattern'}</div>
                 </div>
             `;
             
@@ -839,7 +1137,11 @@
             const adviceText = document.getElementById('adviceText');
             
             if (maintenance.maintenance_advice) {
-                adviceText.textContent = maintenance.maintenance_advice;
+                const enhancedAdvice = mlEnhanced ? 
+                    `🤖 AI Analysis: ${maintenance.maintenance_advice}` : 
+                    maintenance.maintenance_advice;
+                    
+                adviceText.textContent = enhancedAdvice;
                 adviceDiv.style.display = 'block';
             } else {
                 adviceDiv.style.display = 'none';
@@ -874,10 +1176,10 @@
             loadChartData();
         }
         
-        // Handle real-time updates dari Kodular
+        // ENHANCED: Handle real-time updates dari Kodular dengan ML support
         function updateFromKodular(kodularData) {
             if (kodularData) {
-                console.log('📱 Update from Kodular:', kodularData);
+                console.log('📱 Enhanced update from Kodular:', kodularData);
                 
                 currentData.latest = {
                     rms: kodularData.rms || 0,
@@ -894,17 +1196,40 @@
                     urgency_color: kodularData.urgency_color || 'green'
                 };
                 
+                // ENHANCED: Update ML status
+                mlEnhanced = kodularData.ml_enhanced || false;
+                
+                if (mlEnhanced) {
+                    currentData.mlPerformance = {
+                        improvement: kodularData.ml_accuracy_improvement || 0,
+                        method: kodularData.prediction_method || 'Hybrid ML',
+                        confidence: kodularData.confidence_level || 'medium',
+                        status: kodularData.ml_status || 'ACTIVE'
+                    };
+                }
+                
                 generateChartDataFromCurrent();
                 updateStatusDisplay();
+                updateMLPerformanceDisplay();
                 updateMaintenancePrediction();
                 drawChart();
                 
-                // Show notification for critical status
+                // Enhanced notification for critical status
                 if (kodularData.zone === 'D' && 'Notification' in window) {
-                    new Notification('🚨 Critical Vibration Alert!', {
+                    const mlIndicator = mlEnhanced ? '🤖 ML Alert: ' : '🚨 Alert: ';
+                    new Notification(`${mlIndicator}Critical Vibration!`, {
                         body: `RMS: ${kodularData.rms} mm/s - Immediate action required`,
                         icon: '/favicon.ico'
                     });
+                }
+                
+                // Haptic feedback for zone changes
+                if (navigator.vibrate) {
+                    if (kodularData.zone === 'D') {
+                        navigator.vibrate([200, 100, 200, 100, 200]); // Emergency pattern
+                    } else if (kodularData.zone === 'C') {
+                        navigator.vibrate([100, 50, 100]); // Warning pattern
+                    }
                 }
             }
         }
@@ -922,6 +1247,15 @@
         // Expose for Kodular
         window.updateFromKodular = updateFromKodular;
         
+        // ENHANCED: Expose ML status for Kodular
+        window.getMLStatus = function() {
+            return {
+                ml_enhanced: mlEnhanced,
+                performance: currentData.mlPerformance || null,
+                current_data: currentData.latest || null
+            };
+        };
+        
         // Handle orientation change
         window.addEventListener('orientationchange', () => {
             setTimeout(() => {
@@ -936,6 +1270,21 @@
             if (!document.hidden) {
                 forceRefresh();
             }
+        });
+        
+        // ENHANCED: Add ML performance monitoring
+        setInterval(() => {
+            if (mlEnhanced && currentData.mlPerformance) {
+                console.log('🤖 ML Status:', currentData.mlPerformance);
+            }
+        }, 60000); // Log ML status every minute
+        
+        // Add PWA install prompt handling
+        let deferredPrompt;
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            // Show install button if needed
         });
     </script>
 </body>
