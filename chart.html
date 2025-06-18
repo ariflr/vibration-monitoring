@@ -686,7 +686,7 @@
         
         async function loadFromFirebase() {
             try {
-                console.log('📱 Loading enhanced data from Firebase...');
+                console.log('📱 Loading data from Firebase...');
                 
                 // ENHANCED: Try to load enhanced data first
                 const enhancedResponse = await fetch('https://predictive-maintenance-90034-default-rtdb.firebaseio.com/kodular_enhanced.json');
@@ -699,6 +699,7 @@
                 
                 let kodularData = null;
                 let mlData = null;
+                let hasRealData = false;
                 
                 // Try enhanced data first
                 if (enhancedResponse.ok) {
@@ -709,6 +710,7 @@
                         kodularData = enhancedData.basic;
                         mlData = enhancedData.advanced;
                         mlEnhanced = kodularData.ml_enhanced || false;
+                        hasRealData = true;
                     }
                 }
                 
@@ -717,15 +719,22 @@
                     kodularData = await kodularResponse.json();
                     console.log('📊 Basic data loaded:', kodularData);
                     mlEnhanced = kodularData?.ml_enhanced || false;
+                    hasRealData = !!kodularData;
                 }
                 
                 if (kodularData) {
+                    // FIXED: Use real Firebase data
                     currentData.latest = {
                         rms: kodularData.rms || 0,
                         zone: kodularData.zone || 'A',
                         status: kodularData.status || 'Good'
                     };
-                    currentData.timestamp = kodularData.time || new Date().toLocaleTimeString();
+                    
+                    // FIXED: Parse Firebase time properly
+                    const firebaseTime = kodularData.time || new Date().toLocaleTimeString();
+                    currentData.timestamp = firebaseTime;
+                    
+                    console.log('🕒 Firebase time:', firebaseTime, 'RMS:', kodularData.rms);
                     
                     // ENHANCED: Hours-based maintenance data
                     currentData.maintenance = {
@@ -758,7 +767,7 @@
                     updateMaintenancePrediction();
                 }
                 
-                // Load historical data untuk chart
+                // ENHANCED: Load historical data untuk chart dengan real timestamps
                 if (historyResponse.ok) {
                     const historyData = await historyResponse.json();
                     console.log('📈 History data loaded');
@@ -775,13 +784,15 @@
                                 time: data.time || '00:00',
                                 rms: data.rms || 0,
                                 zone: data.zone || 'A',
-                                ml_enhanced: data.ml_enhanced || false
+                                ml_enhanced: data.ml_enhanced || false,
+                                timestamp: data.full_timestamp || new Date().toISOString()
                             });
                         });
                         
                         if (chartData.length > 0) {
                             currentData.chartData = chartData;
                             console.log('📱 Chart data loaded:', chartData.length, 'points');
+                            console.log('🕒 Chart time range:', chartData[0].time, 'to', chartData[chartData.length - 1].time);
                         } else {
                             generateChartDataFromCurrent();
                         }
@@ -789,7 +800,12 @@
                         generateChartDataFromCurrent();
                     }
                 } else {
-                    generateChartDataFromCurrent();
+                    // FIXED: Generate chart data with proper current time if no history
+                    if (hasRealData) {
+                        generateChartDataFromCurrent();
+                    } else {
+                        generateDemoData();
+                    }
                 }
                 
             } catch (error) {
@@ -805,11 +821,13 @@
             }
             
             console.log('📱 Generating chart data from current RMS:', currentData.latest.rms);
+            console.log('🕒 Current timestamp:', currentData.timestamp);
             
             const baseRMS = currentData.latest.rms;
             const chartData = [];
             const now = new Date();
             
+            // FIXED: Use actual current time for chart generation
             for (let i = 0; i < 60; i++) {
                 const timeAgo = new Date(now.getTime() - (59 - i) * 60000);
                 // FIXED: Smaller variation, closer to actual RMS
@@ -825,12 +843,21 @@
                     time: timeAgo.getHours().toString().padStart(2, '0') + ':' + timeAgo.getMinutes().toString().padStart(2, '0'),
                     rms: Math.round(rms * 100) / 100,
                     zone: zone,
-                    ml_enhanced: mlEnhanced
+                    ml_enhanced: mlEnhanced,
+                    timestamp: timeAgo.toISOString()
                 });
             }
             
             currentData.chartData = chartData;
-            console.log('📊 Chart data generated, last RMS:', chartData[chartData.length - 1].rms);
+            console.log('📊 Chart data generated with real times');
+            console.log('🕒 Chart last point time:', chartData[chartData.length - 1].time);
+            console.log('📊 Chart last point RMS:', chartData[chartData.length - 1].rms);
+            
+            // SYNC: Make sure last chart point matches current data
+            const lastPoint = chartData[chartData.length - 1];
+            lastPoint.rms = baseRMS;
+            lastPoint.zone = currentData.latest.zone;
+            lastPoint.time = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
         }
         
         function generateDemoData() {
@@ -1000,7 +1027,17 @@
             
             document.getElementById('currentRMS').textContent = latest.rms.toFixed(2);
             document.getElementById('currentZone').textContent = latest.zone;
-            document.getElementById('lastUpdate').textContent = currentData.timestamp.slice(0, 5);
+            
+            // FIXED: Display proper time from Firebase
+            const displayTime = currentData.timestamp;
+            // Extract just HH:MM from timestamp
+            let timeDisplay = displayTime;
+            if (displayTime.includes(':')) {
+                timeDisplay = displayTime.slice(0, 5);  // Get HH:MM
+            }
+            document.getElementById('lastUpdate').textContent = timeDisplay;
+            
+            console.log('🕒 Displaying time:', timeDisplay, 'from Firebase:', displayTime);
             
             let status = 'Good';
             let statusClass = 'zone-a';
@@ -1172,16 +1209,19 @@
             loadChartData();
         }
         
-        // ENHANCED: Handle real-time updates dari Kodular dengan support hours/days
+        // ENHANCED: Handle real-time updates dari Kodular dengan proper time sync
         function updateFromKodular(kodularData) {
             if (kodularData) {
-                console.log('📱 Enhanced update from Kodular:', kodularData);
+                console.log('📱 Real-time update from Kodular:', kodularData);
+                console.log('🕒 Incoming time:', kodularData.time);
                 
                 currentData.latest = {
                     rms: kodularData.rms || 0,
                     zone: kodularData.zone || 'A',
                     status: kodularData.status || 'Good'
                 };
+                
+                // FIXED: Use proper time from Kodular
                 currentData.timestamp = kodularData.time || new Date().toLocaleTimeString();
                 
                 // ENHANCED: Support both hours and days
@@ -1206,11 +1246,15 @@
                     };
                 }
                 
+                // FIXED: Regenerate chart with current time and RMS
                 generateChartDataFromCurrent();
                 updateStatusDisplay();
                 updateMLPerformanceDisplay();
                 updateMaintenancePrediction();
                 drawChart();
+                
+                console.log('✅ Real-time update completed');
+                console.log('🕒 Updated time display to:', currentData.timestamp);
                 
                 // Enhanced notification for critical status
                 if (kodularData.zone === 'D' && 'Notification' in window) {
