@@ -804,7 +804,7 @@
                 return;
             }
             
-            console.log('📱 Generating enhanced chart data');
+            console.log('📱 Generating chart data from current RMS:', currentData.latest.rms);
             
             const baseRMS = currentData.latest.rms;
             const chartData = [];
@@ -812,7 +812,8 @@
             
             for (let i = 0; i < 60; i++) {
                 const timeAgo = new Date(now.getTime() - (59 - i) * 60000);
-                const variation = Math.sin(i * 0.2) * 0.3 + (Math.random() - 0.5) * 0.2;
+                // FIXED: Smaller variation, closer to actual RMS
+                const variation = Math.sin(i * 0.1) * 0.1 + (Math.random() - 0.5) * 0.05;
                 const rms = Math.max(0.1, baseRMS + variation);
                 
                 let zone = 'A';
@@ -829,22 +830,26 @@
             }
             
             currentData.chartData = chartData;
+            console.log('📊 Chart data generated, last RMS:', chartData[chartData.length - 1].rms);
         }
         
         function generateDemoData() {
-            console.log('📱 Generating enhanced demo data...');
+            console.log('📱 Generating demo data...');
             
             const demoData = [];
             const now = new Date();
             mlEnhanced = true; // Demo with ML enhancement
             
+            // FIXED: Generate data closer to realistic RMS values
+            const baseRMS = 2.2; // Match the displayed RMS
+            
             for (let i = 0; i < 60; i++) {
                 const timeAgo = new Date(now.getTime() - (59 - i) * 60000);
-                const baseValue = 2.0 + Math.sin(i * 0.1) * 0.5;
-                const noise = (Math.random() - 0.5) * 0.3;
-                const rms = Math.max(0.5, baseValue + noise);
+                // Smaller variation around base RMS
+                const variation = Math.sin(i * 0.05) * 0.15 + (Math.random() - 0.5) * 0.1;
+                const rms = Math.max(0.5, baseRMS + variation);
                 
-                let zone = 'B';
+                let zone = 'B'; // Most likely zone for 2.2 RMS
                 if (rms < 1.12) zone = 'A';
                 else if (rms < 4.5) zone = 'B';
                 else if (rms < 11.2) zone = 'C';
@@ -878,9 +883,15 @@
                 }
             };
             
+            // SYNC: Update latest data to match demo RMS
+            currentData.latest.rms = 2.2;
+            currentData.latest.zone = 'B';
+            
             updateStatusDisplay();
             updateMLPerformanceDisplay();
             updateMaintenancePrediction();
+            
+            console.log('📊 Demo data generated - RMS:', currentData.latest.rms);
         }
         
         function drawChart() {
@@ -920,39 +931,44 @@
             const options = {
                 title: mlEnhanced ? 'ML-Enhanced Vibration Trend (1 Hour)' : 'Vibration Trend (1 Hour)',
                 titleTextStyle: {
-                    fontSize: 14,
+                    fontSize: 16,
                     bold: true,
                     color: mlEnhanced ? '#2e7d32' : '#333'
                 },
                 hAxis: {
                     title: 'Time',
-                    titleTextStyle: {fontSize: 10},
-                    textStyle: {fontSize: 9},
-                    slantedText: true,
-                    slantedTextAngle: 45,
-                    showTextEvery: 2
+                    titleTextStyle: {fontSize: 12},
+                    textStyle: {fontSize: 10},
+                    slantedText: false,
+                    showTextEvery: 3
                 },
                 vAxis: {
                     title: 'RMS (mm/s)',
-                    titleTextStyle: {fontSize: 10},
-                    textStyle: {fontSize: 9},
+                    titleTextStyle: {fontSize: 12},
+                    textStyle: {fontSize: 10},
                     minValue: 0,
                     gridlines: {
                         color: '#e0e0e0',
-                        count: 4
-                    }
+                        count: 5
+                    },
+                    baselineColor: '#ccc'
                 },
                 legend: 'none',
-                pointSize: mlEnhanced ? 8 : 6,
-                lineWidth: mlEnhanced ? 4 : 3,
-                backgroundColor: 'transparent',
+                pointSize: mlEnhanced ? 6 : 4,
+                lineWidth: mlEnhanced ? 3 : 2,
+                backgroundColor: '#ffffff',
                 chartArea: {
-                    left: 50,
-                    top: 40,
-                    width: '80%',
-                    height: '65%'
+                    left: 60,
+                    top: 50,
+                    width: '85%',
+                    height: '75%'
                 },
-                colors: [mlEnhanced ? '#2e7d32' : '#007bff']
+                colors: [mlEnhanced ? '#2e7d32' : '#007bff'],
+                curveType: 'function',
+                animation: {
+                    duration: 1000,
+                    easing: 'out'
+                }
             };
             
             chart.draw(data, options);
