@@ -1,833 +1,9 @@
-function updateLoadingState(loading) {
-            const indicator = document.querySelector('.status-indicator');
-            if (loading) {
-                indicator.style.background = '#ffc107';
-                indicator.style.animation = 'pulse 0.5s infinite';
-            } else {
-                indicator.style.background = mlEnhanced ? '#4caf50' : '#28a745';
-                indicator.style.animation = 'pulse 2s infinite';
-            }
-        }
-        
-        async function loadFromFirebase() {
-            try {
-                console.log('📱 Loading ENHANCED data (hours-based) from Firebase...');
-                
-                // ENHANCED: Try to load enhanced data with hours calculation
-                const enhancedResponse = await fetch('https://predictive-maintenance-90034-default-rtdb.firebaseio.com/kodular_enhanced.json');
-                
-                // Try predictions table data
-                const predictionsResponse = await fetch('https://predictive-maintenance-90034-default-rtdb.firebaseio.com/predictions_display.json');
-                
-                // Fallback to kodular_simple
-                const kodularResponse = await fetch('https://predictive-maintenance-90034-default-rtdb.firebaseio.com/kodular_simple.json');
-                
-                // Load historical RMS data untuk chart
-                const historyResponse = await fetch('https://predictive-maintenance-90034-default-rtdb.firebaseio.com/realtime/historical_rms.json');
-                
-                let kodularData = null;
-                let mlData = null;
-                let predictionsData = null;
-                
-                // Try enhanced data first
-                if (enhancedResponse.ok) {
-                    const enhancedData = await enhancedResponse.json();
-                    console.log('📊 Enhanced data loaded:', enhancedData);
-                    
-                    if (enhancedData && enhancedData.basic) {
-                        kodularData = enhancedData.basic;
-                        mlData = enhancedData.advanced;
-                        mlEnhanced = kodularData.ml_enhanced || false;
-                        hoursBasedMode = kodularData.time_unit === 'hours';
-                    }
-                }
-                
-                // Load predictions table
-                if (predictionsResponse.ok) {
-                    predictionsData = await predictionsResponse.json();
-                    console.log('📊 Predictions table loaded:', predictionsData);
-                }
-                
-                // Fallback to simple data
-                if (!kodularData && kodularResponse.ok) {
-                    kodularData = await kodularResponse.json();
-                    console.log('📊 Basic data loaded:', kodularData);
-                    mlEnhanced = kodularData?.ml_enhanced || false;
-                    hoursBasedMode = kodularData?.time_unit === 'hours';
-                }
-                
-                if (kodularData) {
-                    currentData.latest = {
-                        rms: kodularData.rms || 0,
-                        zone: kodularData.zone || 'A',
-                        status: kodularData.status || 'Good'
-                    };
-                    currentData.timestamp = kodularData.time || new Date().toLocaleTimeString();
-                    
-                    // ENHANCED: Hours-based maintenance data
-                    currentData.maintenance = {
-                        next_zone: kodularData.next_zone || 'B',
-                        hours_to_next_zone: kodularData.hours_to_next_zone || 720, // CHANGED: hours instead of days
-                        time_to_next_zone_display: kodularData.time_to_next_zone_display || '30d 0h',
-                        maintenance_advice: kodularData.maintenance_advice || 'Regular maintenance',
-                        urgency: kodularData.urgency || 'LOW',
-                        urgency_color: kodularData.urgency_color || 'green',
-                        time_unit: kodularData.time_unit || 'hours'
-                    };
-                    
-                    // ML performance data
-                    if (mlEnhanced) {
-                        currentData.mlPerformance = {
-                            improvement: kodularData.ml_accuracy_improvement || 0,
-                            method: kodularData.prediction_method || 'Hybrid ML',
-                            confidence: kodularData.confidence_level || 'medium',
-                            status: kodularData.ml_status || 'ACTIVE'
-                        };
-                        
-                        // Advanced ML data if available
-                        if (mlData && mlData.ml_details) {
-                            currentData.mlAdvanced = mlData.ml_details;
-                        }
-                    }
-                    
-                    // ENHANCED: Store predictions table data
-                    if (predictionsData && predictionsData.predictions) {
-                        currentData.predictionsTable = predictionsData.predictions;
-                        currentData.predictionsMetadata = {
-                            total: predictionsData.predictions.length,
-                            generated_at: predictionsData.generated_at,
-                            time_unit: predictionsData.time_unit || 'hours'
-                        };
-                    } else if (mlData && mlData.predictions_table) {
-                        currentData.predictionsTable = mlData.predictions_table;
-                        currentData.predictionsMetadata = {
-                            total: mlData.predictions_table.length,
-                            generated_at: mlData.last_prediction_update,
-                            time_unit: 'hours'
-                        };
-                    }
-                    
-                    updateStatusDisplay();
-                    updateHoursDisplay(); // NEW: Update hours display
-                    updateMLPerformanceDisplay();
-                    updatePredictionsTable(); // NEW: Update detailed predictions table
-                    updateMaintenancePrediction();
-                }
-                
-                // Load historical data untuk chart
-                if (historyResponse.ok) {
-                    const historyData = await historyResponse.json();
-                    console.log('📈 History data loaded');
-                    
-                    if (historyData) {
-                        const chartData = [];
-                        const entries = Object.entries(historyData);
-                        
-                        entries.sort((a, b) => a[0].localeCompare(b[0]));
-                        const last60 = entries.slice(-60);
-                        
-                        last60.forEach(([key, data]) => {
-                            chartData.push({
-                                time: data.time || '00:00',
-                                rms: data.rms || 0,
-                                zone: data.zone || 'A',
-                                ml_enhanced: data.ml_enhanced || false
-                            });
-                        });
-                        
-                        if (chartData.length > 0) {
-                            currentData.chartData = chartData;
-                            console.log('📱 Chart data loaded:', chartData.length, 'points');
-                        } else {
-                            generateChartDataFromCurrent();
-                        }
-                    } else {
-                        generateChartDataFromCurrent();
-                    }
-                } else {
-                    generateChartDataFromCurrent();
-                }
-                
-            } catch (error) {
-                console.error('Firebase load error:', error);
-                generateDemoData();
-            }
-        }
-        
-        // NEW: Update hours display section
-        function updateHoursDisplay() {
-            if (!currentData.maintenance) return;
-            
-            const hoursToNext = currentData.maintenance.hours_to_next_zone || 0;
-            const timeDisplay = currentData.maintenance.time_to_next_zone_display || `${hoursToNext} hours`;
-            const nextZone = currentData.maintenance.next_zone || 'B';
-            
-            document.getElementById('hoursToNext').textContent = hoursToNext.toFixed(1);
-            document.getElementById('hoursDisplay').textContent = `to Zone ${nextZone} (${timeDisplay})`;
-            
-            // Update hours section color based on urgency
-            const hoursSection = document.querySelector('.hours-section');
-            const urgency = currentData.maintenance.urgency || 'LOW';
-            
-            if (urgency === 'HIGH' || urgency === 'CRITICAL') {
-                hoursSection.style.background = 'linear-gradient(135deg, #dc3545 0%, #c82333 100%)';
-            } else if (urgency === 'MEDIUM') {
-                hoursSection.style.background = 'linear-gradient(135deg, #fd7e14 0%, #e55100 100%)';
-            } else {
-                hoursSection.style.background = 'linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%)';
-            }
-        }
-        
-        // NEW: Update detailed predictions table
-        function updatePredictionsTable() {
-            const tableBody = document.getElementById('predictionsTableBody');
-            const predictions = currentData.predictionsTable || [];
-            const metadata = currentData.predictionsMetadata || {};
-            
-            if (predictions.length === 0) {
-                tableBody.innerHTML = `
-                    <tr>
-                        <td colspan="8" style="padding: 20px; text-align: center;">
-                            <div style="color: #666; font-style: italic;">No predictions available</div>
-                            <div style="font-size: 0.75rem; margin-top: 5px;">Model training in progress...</div>
-                        </td>
-                    </tr>
-                `;
-                
-                // Hide table ML badge
-                document.getElementById('tableMLBadge').classList.remove('active');
-                return;
-            }
-            
-            let tableHTML = '';
-            predictions.forEach(pred => {
-                const zoneClass = getZoneClass(pred.predicted_zone || 'A');
-                const confidence = Math.round((pred.confidence || pred.rf_weight || 0) * 100);
-                const rfWeight = Math.round((pred.rf_weight || 0) * 100);
-                
-                // Format horizon
-                const horizonText = pred.horizon_hours ? 
-                    `${pred.horizon_hours}h` : 
-                    `${(pred.horizon_minutes / 60).toFixed(1)}h`;
-                
-                tableHTML += `
-                    <tr>
-                        <td style="font-size: 0.7rem;">${pred.prediction_time || '--'}</td>
-                        <td style="font-weight: 600;">${horizonText}</td>
-                        <td>${pred.current_rms || '--'}</td>
-                        <td style="font-weight: 600; color: #2e7d32;">${pred.predicted_rms || '--'}</td>
-                        <td>
-                            <span class="zone-cell ${zoneClass}">
-                                ${pred.predicted_zone || 'A'}
-                            </span>
-                        </td>
-                        <td style="font-size: 0.7rem;">${(pred.predicted_status || '--').substring(0, 8)}</td>
-                        <td style="font-weight: 600;">${rfWeight}%</td>
-                        <td>
-                            <div class="confidence-bar">
-                                <div class="confidence-fill" style="width: ${confidence}%"></div>
-                            </div>
-                            <div style="font-size: 0.65rem; margin-top: 2px;">${confidence}%</div>
-                        </td>
-                    </tr>
-                `;
-            });
-            
-            tableBody.innerHTML = tableHTML;
-            
-            // Update table metadata
-            document.getElementById('totalPredictionsCount').textContent = metadata.total || predictions.length;
-            document.getElementById('lastPredictionUpdate').textContent = 
-                metadata.generated_at ? new Date(metadata.generated_at).toLocaleTimeString() : '--';
-            
-            // Show table ML badge if ML enhanced
-            const tableMLBadge = document.getElementById('tableMLBadge');
-            if (mlEnhanced) {
-                tableMLBadge.classList.add('active');
-            } else {
-                tableMLBadge.classList.remove('active');
-            }
-        }
-        
-        function generateChartDataFromCurrent() {
-            if (!currentData.latest) {
-                generateDemoData();
-                return;
-            }
-            
-            console.log('📱 Generating enhanced chart data');
-            
-            const baseRMS = currentData.latest.rms;
-            const chartData = [];
-            const now = new Date();
-            
-            for (let i = 0; i < 60; i++) {
-                const timeAgo = new Date(now.getTime() - (59 - i) * 60000);
-                const variation = Math.sin(i * 0.2) * 0.3 + (Math.random() - 0.5) * 0.2;
-                const rms = Math.max(0.1, baseRMS + variation);
-                
-                let zone = 'A';
-                if (rms >= 1.12) zone = 'B';
-                if (rms >= 4.5) zone = 'C';
-                if (rms >= 11.2) zone = 'D';
-                
-                chartData.push({
-                    time: timeAgo.getHours().toString().padStart(2, '0') + ':' + timeAgo.getMinutes().toString().padStart(2, '0'),
-                    rms: Math.round(rms * 100) / 100,
-                    zone: zone,
-                    ml_enhanced: mlEnhanced
-                });
-            }
-            
-            currentData.chartData = chartData;
-        }
-        
-        function generateDemoData() {
-            console.log('📱 Generating ENHANCED demo data (hours-based)...');
-            
-            const demoData = [];
-            const now = new Date();
-            mlEnhanced = true;
-            hoursBasedMode = true;
-            
-            for (let i = 0; i < 60; i++) {
-                const timeAgo = new Date(now.getTime() - (59 - i) * 60000);
-                const baseValue = 2.0 + Math.sin(i * 0.1) * 0.5;
-                const noise = (Math.random() - 0.5) * 0.3;
-                const rms = Math.max(0.5, baseValue + noise);
-                
-                let zone = 'B';
-                if (rms < 1.12) zone = 'A';
-                else if (rms < 4.5) zone = 'B';
-                else if (rms < 11.2) zone = 'C';
-                else zone = 'D';
-                
-                demoData.push({
-                    time: timeAgo.getHours().toString().padStart(2, '0') + ':' + timeAgo.getMinutes().toString().padStart(2, '0'),
-                    rms: Math.round(rms * 100) / 100,
-                    zone: zone,
-                    ml_enhanced: true
-                });
-            }
-            
-            // Generate demo predictions table
-            const demoPredictions = [
-                {
-                    prediction_time: new Date().toLocaleTimeString().slice(0, 5),
-                    horizon_hours: 1.0,
-                    current_rms: 2.45,
-                    predicted_rms: 2.52,
-                    predicted_zone: 'B',
-                    predicted_status: 'Acceptable',
-                    rf_weight: 0.7,
-                    confidence: 0.7
-                },
-                {
-                    prediction_time: new Date().toLocaleTimeString().slice(0, 5),
-                    horizon_hours: 6.0,
-                    current_rms: 2.45,
-                    predicted_rms: 2.78,
-                    predicted_zone: 'B',
-                    predicted_status: 'Acceptable',
-                    rf_weight: 0.6,
-                    confidence: 0.6
-                },
-                {
-                    prediction_time: new Date().toLocaleTimeString().slice(0, 5),
-                    horizon_hours: 24.0,
-                    current_rms: 2.45,
-                    predicted_rms: 3.25,
-                    predicted_zone: 'B',
-                    predicted_status: 'Acceptable',
-                    rf_weight: 0.5,
-                    confidence: 0.5
-                }
-            ];
-            
-            currentData = {
-                chartData: demoData,
-                latest: demoData[demoData.length - 1],
-                timestamp: new Date().toLocaleTimeString(),
-                maintenance: {
-                    next_zone: 'C',
-                    hours_to_next_zone: 36.5, // CHANGED: hours instead of days
-                    time_to_next_zone_display: '1d 12.5h',
-                    maintenance_advice: 'Perawatan preventif dalam 36.5 jam',
-                    urgency: 'MEDIUM',
-                    urgency_color: 'orange',
-                    time_unit: 'hours'
-                },
-                mlPerformance: {
-                    improvement: 28.5,
-                    method: 'Hybrid ML',
-                    confidence: 'high',
-                    status: 'ACTIVE'
-                },
-                predictionsTable: demoPredictions,
-                predictionsMetadata: {
-                    total: 3,
-                    generated_at: new Date().toISOString(),
-                    time_unit: 'hours'
-                }
-            };
-            
-            updateStatusDisplay();
-            updateHoursDisplay();
-            updateMLPerformanceDisplay();
-            updatePredictionsTable();
-            updateMaintenancePrediction();
-        }
-        
-        function drawChart() {
-            if (!currentData.chartData || currentData.chartData.length === 0) {
-                console.log('No chart data to draw');
-                return;
-            }
-            
-            console.log('📱 Drawing enhanced chart (hours-based)');
-            
-            const data = new google.visualization.DataTable();
-            data.addColumn('string', 'Time');
-            data.addColumn('number', 'RMS (mm/s)');
-            data.addColumn({type: 'string', role: 'style'});
-            
-            // Simplified for mobile - only show every 5th point
-            const mobileData = currentData.chartData.filter((_, index) => index % 5 === 0);
-            
-            mobileData.forEach(point => {
-                let color = '#28a745';
-                if (point.zone === 'B') color = '#ffc107';
-                else if (point.zone === 'C') color = '#fd7e14';
-                else if (point.zone === 'D') color = '#dc3545';
-                
-                // Enhanced color for ML predictions
-                if (point.ml_enhanced && mlEnhanced) {
-                    color = enhanceColorForML(color);
-                }
-                
-                data.addRow([
-                    point.time, 
-                    point.rms, 
-                    `color: ${color}; point-size: ${mlEnhanced ? 8 : 6}`
-                ]);
-            });
-            
-            const titleText = mlEnhanced ? 
-                'ML-Enhanced Vibration Trend (Hours-Based)' : 
-                'Vibration Trend (1 Hour)';
-            
-            const options = {
-                title: titleText,
-                titleTextStyle: {
-                    fontSize: 14,
-                    bold: true,
-                    color: mlEnhanced ? '#2e7d32' : '#333'
-                },
-                hAxis: {
-                    title: 'Time',
-                    titleTextStyle: {fontSize: 10},
-                    textStyle: {fontSize: 9},
-                    slantedText: true,
-                    slantedTextAngle: 45,
-                    showTextEvery: 2
-                },
-                vAxis: {
-                    title: 'RMS (mm/s)',
-                    titleTextStyle: {fontSize: 10},
-                    textStyle: {fontSize: 9},
-                    minValue: 0,
-                    gridlines: {
-                        color: '#e0e0e0',
-                        count: 4
-                    }
-                },
-                legend: 'none',
-                pointSize: mlEnhanced ? 8 : 6,
-                lineWidth: mlEnhanced ? 4 : 3,
-                backgroundColor: 'transparent',
-                chartArea: {
-                    left: 50,
-                    top: 40,
-                    width: '80%',
-                    height: '65%'
-                },
-                colors: [mlEnhanced ? '#2e7d32' : '#007bff']
-            };
-            
-            chart.draw(data, options);
-            
-            // Update chart ML badge
-            const chartMLBadge = document.getElementById('chartMLBadge');
-            if (mlEnhanced) {
-                chartMLBadge.classList.add('active');
-                chartMLBadge.textContent = hoursBasedMode ? 'Hours-Based ML' : 'ML Predictions';
-            } else {
-                chartMLBadge.classList.remove('active');
-            }
-        }
-        
-        function enhanceColorForML(baseColor) {
-            // Make colors more vibrant for ML-enhanced data
-            const colorMap = {
-                '#28a745': '#2e7d32', // Darker green
-                '#ffc107': '#ff8f00', // Darker amber
-                '#fd7e14': '#e65100', // Darker orange
-                '#dc3545': '#c62828'  // Darker red
-            };
-            return colorMap[baseColor] || baseColor;
-        }
-        
-        function updateStatusDisplay() {
-            if (!currentData.latest) return;
-            
-            const latest = currentData.latest;
-            
-            document.getElementById('currentRMS').textContent = latest.rms.toFixed(2);
-            document.getElementById('currentZone').textContent = latest.zone;
-            document.getElementById('lastUpdate').textContent = currentData.timestamp.slice(0, 5);
-            
-            let status = 'Good';
-            let statusClass = 'zone-a';
-            
-            if (latest.zone === 'B') {
-                status = 'OK';
-                statusClass = 'zone-b';
-            } else if (latest.zone === 'C') {
-                status = 'Warning';
-                statusClass = 'zone-c';
-            } else if (latest.zone === 'D') {
-                status = 'Critical';
-                statusClass = 'zone-d';
-            }
-            
-            const statusElement = document.getElementById('currentStatus');
-            statusElement.textContent = status;
-            statusElement.className = `status-value ${statusClass}`;
-            
-            const zoneElement = document.getElementById('currentZone');
-            zoneElement.className = `status-value ${statusClass}`;
-            
-            // Update status cards border colors
-            const cards = document.querySelectorAll('.status-card');
-            cards.forEach(card => {
-                card.style.borderColor = getZoneColor(latest.zone);
-            });
-            
-            // Update ML indicators
-            const rmsMLIndicator = document.getElementById('rmsMLIndicator');
-            const zoneMLIndicator = document.getElementById('zoneMLIndicator');
-            
-            if (mlEnhanced) {
-                rmsMLIndicator.classList.add('active');
-                zoneMLIndicator.classList.add('active');
-            } else {
-                rmsMLIndicator.classList.remove('active');
-                zoneMLIndicator.classList.remove('active');
-            }
-        }
-        
-        function updateMLPerformanceDisplay() {
-            const mlPerformanceDiv = document.getElementById('mlPerformance');
-            const mlBadge = document.getElementById('mlBadge');
-            
-            if (mlEnhanced && currentData.mlPerformance) {
-                const perf = currentData.mlPerformance;
-                
-                // Show ML performance section
-                mlPerformanceDiv.classList.add('active');
-                mlBadge.classList.add('active');
-                
-                // Update ML metrics
-                document.getElementById('mlImprovement').textContent = `+${perf.improvement.toFixed(1)}%`;
-                document.getElementById('mlConfidence').textContent = perf.confidence.toUpperCase();
-                document.getElementById('mlMethod').textContent = perf.method;
-                
-                // Calculate accuracy from improvement
-                const baseAccuracy = 90;
-                const mlAccuracy = baseAccuracy + (perf.improvement * 0.3);
-                document.getElementById('mlAccuracy').textContent = `${mlAccuracy.toFixed(1)}%`;
-                
-                // Update predictions ML badge
-                const predMLBadge = document.getElementById('predMLBadge');
-                predMLBadge.classList.add('active');
-                predMLBadge.textContent = hoursBasedMode ? 'Hours-Based AI' : 'AI Powered';
-                
-            } else {
-                // Hide ML performance section
-                mlPerformanceDiv.classList.remove('active');
-                mlBadge.classList.remove('active');
-                
-                const predMLBadge = document.getElementById('predMLBadge');
-                predMLBadge.classList.remove('active');
-            }
-        }
-        
-        function updateMaintenancePrediction() {
-            if (!currentData.maintenance) return;
-            
-            const maintenance = currentData.maintenance;
-            const predGrid = document.getElementById('predGrid');
-            
-            let urgencyClass = 'zone-a';
-            if (maintenance.urgency === 'MEDIUM') urgencyClass = 'zone-b';
-            else if (maintenance.urgency === 'HIGH') urgencyClass = 'zone-c';
-            else if (maintenance.urgency === 'URGENT') urgencyClass = 'zone-d';
-            
-            // ENHANCED: Hours-based prediction display
-            const timeValue = hoursBasedMode ? 
-                `${maintenance.hours_to_next_zone.toFixed(1)}h` : 
-                `${maintenance.days_to_next_zone} days`;
-            
-            const timeLabel = hoursBasedMode ? 
-                `Hours to Zone ${maintenance.next_zone}` : 
-                `Days to Zone ${maintenance.next_zone}`;
-            
-            const predHTML = `
-                <div class="pred-item">
-                    <div class="pred-time">Current Status</div>
-                    <div class="pred-value ${currentData.latest ? getZoneClass(currentData.latest.zone) : 'zone-a'}">
-                        Zone ${currentData.latest ? currentData.latest.zone : 'A'}
-                    </div>
-                    <div class="pred-desc">${mlEnhanced ? 'ML Enhanced' : 'Current condition'}</div>
-                </div>
-                <div class="pred-item">
-                    <div class="pred-time">${timeLabel}</div>
-                    <div class="pred-value ${getZoneClass(maintenance.next_zone)}">${timeValue}</div>
-                    <div class="pred-desc">${mlEnhanced ? 'AI Prediction' : 'Time remaining'}</div>
-                </div>
-                <div class="pred-item">
-                    <div class="pred-time">Priority Level</div>
-                    <div class="pred-value ${urgencyClass}">${maintenance.urgency}</div>
-                    <div class="pred-desc">Maintenance urgency</div>
-                </div>
-                <div class="pred-item">
-                    <div class="pred-time">${mlEnhanced ? 'ML Confidence' : 'Trend Analysis'}</div>
-                    <div class="pred-value">
-                        ${mlEnhanced ? 
-                            (currentData.mlPerformance ? currentData.mlPerformance.confidence.toUpperCase() : 'HIGH') : 
-                            (currentData.latest && currentData.latest.rms > 2.5 ? '📈 Rising' : '📊 Stable')
-                        }
-                    </div>
-                    <div class="pred-desc">${mlEnhanced ? 'Prediction quality' : 'Recent pattern'}</div>
-                </div>
-            `;
-            
-            predGrid.innerHTML = predHTML;
-            
-            // Show maintenance advice
-            const adviceDiv = document.getElementById('maintenanceAdvice');
-            const adviceText = document.getElementById('adviceText');
-            
-            if (maintenance.maintenance_advice) {
-                const enhancedAdvice = mlEnhanced ? 
-                    `🤖 AI Analysis: ${maintenance.maintenance_advice}` : 
-                    maintenance.maintenance_advice;
-                    
-                adviceText.textContent = enhancedAdvice;
-                adviceDiv.style.display = 'block';
-            } else {
-                adviceDiv.style.display = 'none';
-            }
-        }
-        
-        function getZoneClass(zone) {
-            switch(zone) {
-                case 'A': return 'zone-a';
-                case 'B': return 'zone-b';
-                case 'C': return 'zone-c';
-                case 'D': return 'zone-d';
-                default: return 'zone-a';
-            }
-        }
-        
-        function getZoneColor(zone) {
-            switch(zone) {
-                case 'A': return '#28a745';
-                case 'B': return '#ffc107';
-                case 'C': return '#fd7e14';
-                case 'D': return '#dc3545';
-                default: return '#28a745';
-            }
-        }
-        
-        function forceRefresh() {
-            console.log('📱 Force refresh triggered (hours-based)');
-            if (navigator.vibrate) {
-                navigator.vibrate([10, 50, 10]);
-            }
-            loadChartData();
-        }
-        
-        // ENHANCED: Handle real-time updates dengan hours support
-        function updateFromKodular(kodularData) {
-            if (kodularData) {
-                console.log('📱 Enhanced update from Kodular (hours-based):', kodularData);
-                
-                currentData.latest = {
-                    rms: kodularData.rms || 0,
-                    zone: kodularData.zone || 'A',
-                    status: kodularData.status || 'Good'
-                };
-                currentData.timestamp = kodularData.time || new Date().toLocaleTimeString();
-                
-                // ENHANCED: Hours-based maintenance data
-                currentData.maintenance = {
-                    next_zone: kodularData.next_zone || 'B',
-                    hours_to_next_zone: kodularData.hours_to_next_zone || 720,
-                    time_to_next_zone_display: kodularData.time_to_next_zone_display || '30d 0h',
-                    maintenance_advice: kodularData.maintenance_advice || 'Regular maintenance',
-                    urgency: kodularData.urgency || 'LOW',
-                    urgency_color: kodularData.urgency_color || 'green',
-                    time_unit: kodularData.time_unit || 'hours'
-                };
-                
-                mlEnhanced = kodularData.ml_enhanced || false;
-                hoursBasedMode = kodularData.time_unit === 'hours';
-                
-                if (mlEnhanced) {
-                    currentData.mlPerformance = {
-                        improvement: kodularData.ml_accuracy_improvement || 0,
-                        method: kodularData.prediction_method || 'Hybrid ML',
-                        confidence: kodularData.confidence_level || 'medium',
-                        status: kodularData.ml_status || 'ACTIVE'
-                    };
-                }
-                
-                generateChartDataFromCurrent();
-                updateStatusDisplay();
-                updateHoursDisplay();
-                updateMLPerformanceDisplay();
-                updateMaintenancePrediction();
-                drawChart();
-                
-                // Enhanced notification for critical status
-                if (kodularData.zone === 'D' && 'Notification' in window) {
-                    const mlIndicator = mlEnhanced ? '🤖 ML Alert: ' : '🚨 Alert: ';
-                    new Notification(`${mlIndicator}Critical Vibration!`, {
-                        body: `RMS: ${kodularData.rms} mm/s - Immediate action required`,
-                        icon: '/favicon.ico'
-                    });
-                }
-                
-                // Haptic feedback for zone changes
-                if (navigator.vibrate) {
-                    if (kodularData.zone === 'D') {
-                        navigator.vibrate([200, 100, 200, 100, 200]); // Emergency pattern
-                    } else if (kodularData.zone === 'C') {
-                        navigator.vibrate([100, 50, 100]); // Warning pattern
-                    }
-                }
-            }
-        }
-        
-        // Request notification permission on load
-        if ('Notification' in window && Notification.permission === 'default') {
-            Notification.requestPermission();
-        }
-        
-        // Service Worker for offline support
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('/sw.js').catch(console.error);
-        }
-        
-        // Expose for Kodular
-        window.updateFromKodular = updateFromKodular;
-        
-        // ENHANCED: Expose hours-based ML status for Kodular
-        window.getMLStatus = function() {
-            return {
-                ml_enhanced: mlEnhanced,
-                hours_based_mode: hoursBasedMode,
-                performance: currentData.mlPerformance || null,
-                current_data: currentData.latest || null,
-                maintenance: currentData.maintenance || null,
-                predictions_table: currentData.predictionsTable || null
-            };
-        };
-        
-        // NEW: Get predictions table data for Kodular
-        window.getPredictionsTable = function() {
-            return {
-                predictions: currentData.predictionsTable || [],
-                metadata: currentData.predictionsMetadata || {},
-                ml_enhanced: mlEnhanced,
-                hours_based: hoursBasedMode
-            };
-        };
-        
-        // Handle orientation change
-        window.addEventListener('orientationchange', () => {
-            setTimeout(() => {
-                if (chart) {
-                    chart.draw(chart.getDataTable(), chart.getOptions());
-                }
-            }, 500);
-        });
-        
-        // Handle visibility change (app comes back to foreground)
-        document.addEventListener('visibilitychange', () => {
-            if (!document.hidden) {
-                forceRefresh();
-            }
-        });
-        
-        // ENHANCED: Hours-based ML performance monitoring
-        setInterval(() => {
-            if (mlEnhanced && currentData.mlPerformance) {
-                console.log('🤖 Hours-Based ML Status:', {
-                    ...currentData.mlPerformance,
-                    hours_mode: hoursBasedMode,
-                    predictions_count: currentData.predictionsTable?.length || 0
-                });
-            }
-        }, 60000); // Log ML status every minute
-        
-        // Add PWA install prompt handling
-        let deferredPrompt;
-        window.addEventListener('beforeinstallprompt', (e) => {
-            e.preventDefault();
-            deferredPrompt = e;
-            // Show install button if needed
-        });
-        
-        // ENHANCED: Handle predictions table updates from external sources
-        window.updatePredictionsTable = function(predictionsData) {
-            if (predictionsData && predictionsData.predictions) {
-                currentData.predictionsTable = predictionsData.predictions;
-                currentData.predictionsMetadata = {
-                    total: predictionsData.predictions.length,
-                    generated_at: predictionsData.generated_at || new Date().toISOString(),
-                    time_unit: predictionsData.time_unit || 'hours'
-                };
-                
-                updatePredictionsTable();
-                console.log('📊 Predictions table updated from external source');
-            }
-        };
-        
-        // ENHANCED: Handle hours-based maintenance updates
-        window.updateMaintenanceHours = function(maintenanceData) {
-            if (maintenanceData) {
-                currentData.maintenance = {
-                    ...currentData.maintenance,
-                    ...maintenanceData,
-                    time_unit: 'hours'
-                };
-                
-                hoursBasedMode = true;
-                updateHoursDisplay();
-                updateMaintenancePrediction();
-                console.log('⏰ Maintenance data updated to hours-based');
-            }
-        };
-    </script>
-</body>
-</html><!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Enhanced Vibration Monitor - Hours Based ML</title>
+    <title>Enhanced Vibration Monitor - Hours Based</title>
     <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
     <style>
         * {
@@ -873,19 +49,7 @@ function updateLoadingState(loading) {
             opacity: 0.9;
         }
         
-        /* ENHANCED: Hours Badge */
-        .hours-badge {
-            position: absolute;
-            top: 10px;
-            left: 10px;
-            background: rgba(255, 193, 7, 0.9);
-            color: #333;
-            padding: 5px 10px;
-            border-radius: 15px;
-            font-size: 0.7rem;
-            font-weight: bold;
-            display: block;
-        }
+        /* ENHANCED: Hours Badge - REMOVED */
         
         /* ML Enhancement Badge */
         .ml-badge {
@@ -968,34 +132,6 @@ function updateLoadingState(loading) {
         .zone-c { color: #fd7e14; border-color: #fd7e14; }
         .zone-d { color: #dc3545; border-color: #dc3545; }
         
-        /* NEW: Hours Display Section */
-        .hours-section {
-            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%);
-            color: white;
-            padding: 20px;
-            text-align: center;
-            margin: 15px;
-            border-radius: 15px;
-            box-shadow: 0 4px 15px rgba(238, 90, 111, 0.3);
-        }
-        
-        .hours-section h3 {
-            font-size: 1rem;
-            margin-bottom: 10px;
-            opacity: 0.9;
-        }
-        
-        .hours-value {
-            font-size: 2.5rem;
-            font-weight: 700;
-            margin-bottom: 5px;
-        }
-        
-        .hours-display {
-            font-size: 1.1rem;
-            opacity: 0.9;
-        }
-        
         .chart-section {
             padding: 15px;
         }
@@ -1058,103 +194,6 @@ function updateLoadingState(loading) {
         .zone-dot.zone-b { background-color: #ffc107; }
         .zone-dot.zone-c { background-color: #fd7e14; }
         .zone-dot.zone-d { background-color: #dc3545; }
-        
-        /* NEW: Detailed Predictions Table */
-        .predictions-table-section {
-            margin: 15px;
-            background: white;
-            border-radius: 15px;
-            overflow: hidden;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-        }
-        
-        .predictions-table-header {
-            background: linear-gradient(135deg, #9c88ff 0%, #8c7ae6 100%);
-            color: white;
-            padding: 15px;
-            font-weight: bold;
-            font-size: 1.1rem;
-            position: relative;
-        }
-        
-        .predictions-table-header::before {
-            content: "📊";
-            margin-right: 8px;
-        }
-        
-        .table-ml-badge {
-            position: absolute;
-            top: 50%;
-            right: 15px;
-            transform: translateY(-50%);
-            background: rgba(255, 255, 255, 0.2);
-            padding: 3px 8px;
-            border-radius: 10px;
-            font-size: 0.65rem;
-            display: none;
-        }
-        
-        .table-ml-badge.active {
-            display: block;
-        }
-        
-        .predictions-table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-        
-        .predictions-table th,
-        .predictions-table td {
-            padding: 8px 4px;
-            text-align: center;
-            border-bottom: 1px solid #e9ecef;
-            font-size: 0.75rem;
-        }
-        
-        .predictions-table th {
-            background: #f8f9fa;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            font-size: 0.7rem;
-        }
-        
-        .predictions-table tr:nth-child(even) {
-            background: #f8f9fa;
-        }
-        
-        .predictions-table tr:hover {
-            background: #e3f2fd;
-        }
-        
-        .zone-cell {
-            font-weight: 600;
-            padding: 3px 8px;
-            border-radius: 10px;
-            display: inline-block;
-            min-width: 25px;
-            font-size: 0.7rem;
-        }
-        
-        .zone-cell.zone-a { background: #e8f5e8; color: #2e7d32; }
-        .zone-cell.zone-b { background: #fff8e1; color: #f57c00; }
-        .zone-cell.zone-c { background: #fff3e0; color: #e65100; }
-        .zone-cell.zone-d { background: #ffebee; color: #c62828; }
-        
-        .confidence-bar {
-            background: #e0e0e0;
-            border-radius: 8px;
-            height: 6px;
-            overflow: hidden;
-            margin: 2px 0;
-        }
-        
-        .confidence-fill {
-            height: 100%;
-            background: linear-gradient(90deg, #28a745, #20c997);
-            border-radius: 8px;
-            transition: width 0.3s ease;
-        }
         
         .predictions {
             margin: 15px;
@@ -1422,12 +461,6 @@ function updateLoadingState(loading) {
             .ml-metrics {
                 grid-template-columns: 1fr;
             }
-            
-            .predictions-table th,
-            .predictions-table td {
-                padding: 6px 2px;
-                font-size: 0.65rem;
-            }
         }
         
         /* Landscape mode adjustments */
@@ -1443,14 +476,6 @@ function updateLoadingState(loading) {
             .header h1 {
                 font-size: 1.2rem;
             }
-            
-            .hours-section {
-                padding: 15px;
-            }
-            
-            .hours-value {
-                font-size: 2rem;
-            }
         }
         
         /* Dark mode support */
@@ -1464,10 +489,13 @@ function updateLoadingState(loading) {
                 color: white;
             }
             
-            .status-card, .zone-legend-item, .predictions, .pred-item,
-            .predictions-table-section, .threshold-info {
+            .status-card, .zone-legend-item, .predictions, .pred-item {
                 background: #4a5568;
                 color: white;
+            }
+            
+            .threshold-info {
+                background: #4a5568;
             }
             
             .threshold-header {
@@ -1483,19 +511,6 @@ function updateLoadingState(loading) {
                 background: #4a5568;
                 color: white;
             }
-            
-            .predictions-table th {
-                background: #2d3748;
-                color: white;
-            }
-            
-            .predictions-table tr:nth-child(even) {
-                background: #2d3748;
-            }
-            
-            .predictions-table tr:hover {
-                background: #4a5568;
-            }
         }
     </style>
 </head>
@@ -1504,10 +519,9 @@ function updateLoadingState(loading) {
         <div class="status-indicator"></div>
         
         <div class="header">
-            <div class="hours-badge">⏰ HOURS Based</div>
             <div class="ml-badge" id="mlBadge">🤖 ML Enhanced</div>
             <h1>🔧 Vibration Monitor</h1>
-            <p>Hours-Based ML Machine Health</p>
+            <p>Real-time Machine Health</p>
         </div>
         
         <div class="status-grid">
@@ -1529,13 +543,6 @@ function updateLoadingState(loading) {
                 <div class="status-value" id="lastUpdate">--</div>
                 <div class="status-label">Last Update</div>
             </div>
-        </div>
-        
-        <!-- NEW: Hours Display Section -->
-        <div class="hours-section">
-            <h3>🕒 Time to Next Zone</h3>
-            <div class="hours-value" id="hoursToNext">--</div>
-            <div class="hours-display" id="hoursDisplay">-- hours remaining</div>
         </div>
         
         <!-- ML Performance Section -->
@@ -1584,41 +591,6 @@ function updateLoadingState(loading) {
                     <div class="zone-dot zone-d"></div>
                     <span>Zone D: Critical</span>
                 </div>
-            </div>
-        </div>
-        
-        <!-- NEW: Detailed Predictions Table -->
-        <div class="predictions-table-section">
-            <div class="predictions-table-header">
-                Detailed Predictions Table
-                <div class="table-ml-badge" id="tableMLBadge">AI Powered</div>
-            </div>
-            <div style="overflow-x: auto;">
-                <table class="predictions-table" id="predictionsDetailTable">
-                    <thead>
-                        <tr>
-                            <th>Time</th>
-                            <th>Horizon</th>
-                            <th>Current</th>
-                            <th>Predicted</th>
-                            <th>Zone</th>
-                            <th>Status</th>
-                            <th>RF%</th>
-                            <th>Conf</th>
-                        </tr>
-                    </thead>
-                    <tbody id="predictionsTableBody">
-                        <tr>
-                            <td colspan="8" style="padding: 20px; text-align: center;">
-                                <div style="color: #666; font-style: italic;">Loading predictions table...</div>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-            <div style="padding: 10px; text-align: center; font-size: 0.75rem; color: #666;">
-                Total Predictions: <span id="totalPredictionsCount">0</span> | 
-                Last Updated: <span id="lastPredictionUpdate">--</span>
             </div>
         </div>
         
@@ -1683,7 +655,6 @@ function updateLoadingState(loading) {
         let currentData = {};
         let isLoading = false;
         let mlEnhanced = false;
-        let hoursBasedMode = true; // NEW: Hours-based mode flag
         
         function initializeChart() {
             const container = document.getElementById('chartContainer');
@@ -1700,11 +671,12 @@ function updateLoadingState(loading) {
         }
         
         function addTouchFeedback() {
+            // Add haptic feedback for mobile
             const cards = document.querySelectorAll('.status-card, .refresh-btn');
             cards.forEach(card => {
                 card.addEventListener('touchstart', () => {
                     if (navigator.vibrate) {
-                        navigator.vibrate(10);
+                        navigator.vibrate(10); // Light haptic feedback
                     }
                 });
             });
@@ -1731,4 +703,616 @@ function updateLoadingState(loading) {
         }
         
         function updateLoadingState(loading) {
-            const indicator
+            const indicator = document.querySelector('.status-indicator');
+            if (loading) {
+                indicator.style.background = '#ffc107';
+                indicator.style.animation = 'pulse 0.5s infinite';
+            } else {
+                indicator.style.background = mlEnhanced ? '#4caf50' : '#28a745';
+                indicator.style.animation = 'pulse 2s infinite';
+            }
+        }
+        
+        async function loadFromFirebase() {
+            try {
+                console.log('📱 Loading enhanced data from Firebase...');
+                
+                // ENHANCED: Try to load enhanced data first
+                const enhancedResponse = await fetch('https://predictive-maintenance-90034-default-rtdb.firebaseio.com/kodular_enhanced.json');
+                
+                // Fallback to kodular_simple
+                const kodularResponse = await fetch('https://predictive-maintenance-90034-default-rtdb.firebaseio.com/kodular_simple.json');
+                
+                // Load historical RMS data untuk chart
+                const historyResponse = await fetch('https://predictive-maintenance-90034-default-rtdb.firebaseio.com/realtime/historical_rms.json');
+                
+                let kodularData = null;
+                let mlData = null;
+                
+                // Try enhanced data first
+                if (enhancedResponse.ok) {
+                    const enhancedData = await enhancedResponse.json();
+                    console.log('📊 Enhanced data loaded:', enhancedData);
+                    
+                    if (enhancedData && enhancedData.basic) {
+                        kodularData = enhancedData.basic;
+                        mlData = enhancedData.advanced;
+                        mlEnhanced = kodularData.ml_enhanced || false;
+                    }
+                }
+                
+                // Fallback to simple data
+                if (!kodularData && kodularResponse.ok) {
+                    kodularData = await kodularResponse.json();
+                    console.log('📊 Basic data loaded:', kodularData);
+                    mlEnhanced = kodularData?.ml_enhanced || false;
+                }
+                
+                if (kodularData) {
+                    currentData.latest = {
+                        rms: kodularData.rms || 0,
+                        zone: kodularData.zone || 'A',
+                        status: kodularData.status || 'Good'
+                    };
+                    currentData.timestamp = kodularData.time || new Date().toLocaleTimeString();
+                    
+                    // ENHANCED: Hours-based maintenance data
+                    currentData.maintenance = {
+                        next_zone: kodularData.next_zone || 'B',
+                        // CHANGED: Support both days and hours 
+                        time_to_next: kodularData.hours_to_next_zone || (kodularData.days_to_next_zone * 24) || 720,
+                        time_unit: kodularData.time_unit || 'hours',
+                        maintenance_advice: kodularData.maintenance_advice || 'Regular maintenance',
+                        urgency: kodularData.urgency || 'LOW',
+                        urgency_color: kodularData.urgency_color || 'green'
+                    };
+                    
+                    // ML performance data
+                    if (mlEnhanced) {
+                        currentData.mlPerformance = {
+                            improvement: kodularData.ml_accuracy_improvement || 0,
+                            method: kodularData.prediction_method || 'Hybrid ML',
+                            confidence: kodularData.confidence_level || 'medium',
+                            status: kodularData.ml_status || 'ACTIVE'
+                        };
+                        
+                        // Advanced ML data if available
+                        if (mlData && mlData.ml_details) {
+                            currentData.mlAdvanced = mlData.ml_details;
+                        }
+                    }
+                    
+                    updateStatusDisplay();
+                    updateMLPerformanceDisplay();
+                    updateMaintenancePrediction();
+                }
+                
+                // Load historical data untuk chart
+                if (historyResponse.ok) {
+                    const historyData = await historyResponse.json();
+                    console.log('📈 History data loaded');
+                    
+                    if (historyData) {
+                        const chartData = [];
+                        const entries = Object.entries(historyData);
+                        
+                        entries.sort((a, b) => a[0].localeCompare(b[0]));
+                        const last60 = entries.slice(-60);
+                        
+                        last60.forEach(([key, data]) => {
+                            chartData.push({
+                                time: data.time || '00:00',
+                                rms: data.rms || 0,
+                                zone: data.zone || 'A',
+                                ml_enhanced: data.ml_enhanced || false
+                            });
+                        });
+                        
+                        if (chartData.length > 0) {
+                            currentData.chartData = chartData;
+                            console.log('📱 Chart data loaded:', chartData.length, 'points');
+                        } else {
+                            generateChartDataFromCurrent();
+                        }
+                    } else {
+                        generateChartDataFromCurrent();
+                    }
+                } else {
+                    generateChartDataFromCurrent();
+                }
+                
+            } catch (error) {
+                console.error('Firebase load error:', error);
+                generateDemoData();
+            }
+        }
+        
+        function generateChartDataFromCurrent() {
+            if (!currentData.latest) {
+                generateDemoData();
+                return;
+            }
+            
+            console.log('📱 Generating enhanced chart data');
+            
+            const baseRMS = currentData.latest.rms;
+            const chartData = [];
+            const now = new Date();
+            
+            for (let i = 0; i < 60; i++) {
+                const timeAgo = new Date(now.getTime() - (59 - i) * 60000);
+                const variation = Math.sin(i * 0.2) * 0.3 + (Math.random() - 0.5) * 0.2;
+                const rms = Math.max(0.1, baseRMS + variation);
+                
+                let zone = 'A';
+                if (rms >= 1.12) zone = 'B';
+                if (rms >= 4.5) zone = 'C';
+                if (rms >= 11.2) zone = 'D';
+                
+                chartData.push({
+                    time: timeAgo.getHours().toString().padStart(2, '0') + ':' + timeAgo.getMinutes().toString().padStart(2, '0'),
+                    rms: Math.round(rms * 100) / 100,
+                    zone: zone,
+                    ml_enhanced: mlEnhanced
+                });
+            }
+            
+            currentData.chartData = chartData;
+        }
+        
+        function generateDemoData() {
+            console.log('📱 Generating enhanced demo data...');
+            
+            const demoData = [];
+            const now = new Date();
+            mlEnhanced = true; // Demo with ML enhancement
+            
+            for (let i = 0; i < 60; i++) {
+                const timeAgo = new Date(now.getTime() - (59 - i) * 60000);
+                const baseValue = 2.0 + Math.sin(i * 0.1) * 0.5;
+                const noise = (Math.random() - 0.5) * 0.3;
+                const rms = Math.max(0.5, baseValue + noise);
+                
+                let zone = 'B';
+                if (rms < 1.12) zone = 'A';
+                else if (rms < 4.5) zone = 'B';
+                else if (rms < 11.2) zone = 'C';
+                else zone = 'D';
+                
+                demoData.push({
+                    time: timeAgo.getHours().toString().padStart(2, '0') + ':' + timeAgo.getMinutes().toString().padStart(2, '0'),
+                    rms: Math.round(rms * 100) / 100,
+                    zone: zone,
+                    ml_enhanced: true
+                });
+            }
+            
+            currentData = {
+                chartData: demoData,
+                latest: demoData[demoData.length - 1],
+                timestamp: new Date().toLocaleTimeString(),
+                maintenance: {
+                    next_zone: 'C',
+                    time_to_next: 36.5, // CHANGED: hours instead of days
+                    time_unit: 'hours',
+                    maintenance_advice: 'Perawatan preventif dalam 36.5 jam',
+                    urgency: 'MEDIUM',
+                    urgency_color: 'orange'
+                },
+                mlPerformance: {
+                    improvement: 28.5,
+                    method: 'Hybrid ML',
+                    confidence: 'high',
+                    status: 'ACTIVE'
+                }
+            };
+            
+            updateStatusDisplay();
+            updateMLPerformanceDisplay();
+            updateMaintenancePrediction();
+        }
+        
+        function drawChart() {
+            if (!currentData.chartData || currentData.chartData.length === 0) {
+                console.log('No chart data to draw');
+                return;
+            }
+            
+            console.log('📱 Drawing enhanced chart');
+            
+            const data = new google.visualization.DataTable();
+            data.addColumn('string', 'Time');
+            data.addColumn('number', 'RMS (mm/s)');
+            data.addColumn({type: 'string', role: 'style'});
+            
+            // Simplified for mobile - only show every 5th point
+            const mobileData = currentData.chartData.filter((_, index) => index % 5 === 0);
+            
+            mobileData.forEach(point => {
+                let color = '#28a745';
+                if (point.zone === 'B') color = '#ffc107';
+                else if (point.zone === 'C') color = '#fd7e14';
+                else if (point.zone === 'D') color = '#dc3545';
+                
+                // Enhanced color for ML predictions
+                if (point.ml_enhanced && mlEnhanced) {
+                    color = enhanceColorForML(color);
+                }
+                
+                data.addRow([
+                    point.time, 
+                    point.rms, 
+                    `color: ${color}; point-size: ${mlEnhanced ? 8 : 6}`
+                ]);
+            });
+            
+            const options = {
+                title: mlEnhanced ? 'ML-Enhanced Vibration Trend (1 Hour)' : 'Vibration Trend (1 Hour)',
+                titleTextStyle: {
+                    fontSize: 14,
+                    bold: true,
+                    color: mlEnhanced ? '#2e7d32' : '#333'
+                },
+                hAxis: {
+                    title: 'Time',
+                    titleTextStyle: {fontSize: 10},
+                    textStyle: {fontSize: 9},
+                    slantedText: true,
+                    slantedTextAngle: 45,
+                    showTextEvery: 2
+                },
+                vAxis: {
+                    title: 'RMS (mm/s)',
+                    titleTextStyle: {fontSize: 10},
+                    textStyle: {fontSize: 9},
+                    minValue: 0,
+                    gridlines: {
+                        color: '#e0e0e0',
+                        count: 4
+                    }
+                },
+                legend: 'none',
+                pointSize: mlEnhanced ? 8 : 6,
+                lineWidth: mlEnhanced ? 4 : 3,
+                backgroundColor: 'transparent',
+                chartArea: {
+                    left: 50,
+                    top: 40,
+                    width: '80%',
+                    height: '65%'
+                },
+                colors: [mlEnhanced ? '#2e7d32' : '#007bff']
+            };
+            
+            chart.draw(data, options);
+            
+            // Update chart ML badge
+            const chartMLBadge = document.getElementById('chartMLBadge');
+            if (mlEnhanced) {
+                chartMLBadge.classList.add('active');
+            } else {
+                chartMLBadge.classList.remove('active');
+            }
+        }
+        
+        function enhanceColorForML(baseColor) {
+            // Make colors more vibrant for ML-enhanced data
+            const colorMap = {
+                '#28a745': '#2e7d32', // Darker green
+                '#ffc107': '#ff8f00', // Darker amber
+                '#fd7e14': '#e65100', // Darker orange
+                '#dc3545': '#c62828'  // Darker red
+            };
+            return colorMap[baseColor] || baseColor;
+        }
+        
+        function updateStatusDisplay() {
+            if (!currentData.latest) return;
+            
+            const latest = currentData.latest;
+            
+            document.getElementById('currentRMS').textContent = latest.rms.toFixed(2);
+            document.getElementById('currentZone').textContent = latest.zone;
+            document.getElementById('lastUpdate').textContent = currentData.timestamp.slice(0, 5);
+            
+            let status = 'Good';
+            let statusClass = 'zone-a';
+            
+            if (latest.zone === 'B') {
+                status = 'OK';
+                statusClass = 'zone-b';
+            } else if (latest.zone === 'C') {
+                status = 'Warning';
+                statusClass = 'zone-c';
+            } else if (latest.zone === 'D') {
+                status = 'Critical';
+                statusClass = 'zone-d';
+            }
+            
+            const statusElement = document.getElementById('currentStatus');
+            statusElement.textContent = status;
+            statusElement.className = `status-value ${statusClass}`;
+            
+            const zoneElement = document.getElementById('currentZone');
+            zoneElement.className = `status-value ${statusClass}`;
+            
+            // Update status cards border colors
+            const cards = document.querySelectorAll('.status-card');
+            cards.forEach(card => {
+                card.style.borderColor = getZoneColor(latest.zone);
+            });
+            
+            // Update ML indicators
+            const rmsMLIndicator = document.getElementById('rmsMLIndicator');
+            const zoneMLIndicator = document.getElementById('zoneMLIndicator');
+            
+            if (mlEnhanced) {
+                rmsMLIndicator.classList.add('active');
+                zoneMLIndicator.classList.add('active');
+            } else {
+                rmsMLIndicator.classList.remove('active');
+                zoneMLIndicator.classList.remove('active');
+            }
+        }
+        
+        function updateMLPerformanceDisplay() {
+            const mlPerformanceDiv = document.getElementById('mlPerformance');
+            const mlBadge = document.getElementById('mlBadge');
+            
+            if (mlEnhanced && currentData.mlPerformance) {
+                const perf = currentData.mlPerformance;
+                
+                // Show ML performance section
+                mlPerformanceDiv.classList.add('active');
+                mlBadge.classList.add('active');
+                
+                // Update ML metrics
+                document.getElementById('mlImprovement').textContent = `+${perf.improvement.toFixed(1)}%`;
+                document.getElementById('mlConfidence').textContent = perf.confidence.toUpperCase();
+                document.getElementById('mlMethod').textContent = perf.method;
+                
+                // Calculate accuracy from improvement
+                const baseAccuracy = 90; // Assume base 90% accuracy
+                const mlAccuracy = baseAccuracy + (perf.improvement * 0.3);
+                document.getElementById('mlAccuracy').textContent = `${mlAccuracy.toFixed(1)}%`;
+                
+                // Update predictions ML badge
+                const predMLBadge = document.getElementById('predMLBadge');
+                predMLBadge.classList.add('active');
+                
+            } else {
+                // Hide ML performance section
+                mlPerformanceDiv.classList.remove('active');
+                mlBadge.classList.remove('active');
+                
+                const predMLBadge = document.getElementById('predMLBadge');
+                predMLBadge.classList.remove('active');
+            }
+        }
+        
+        function updateMaintenancePrediction() {
+            if (!currentData.maintenance) return;
+            
+            const maintenance = currentData.maintenance;
+            const predGrid = document.getElementById('predGrid');
+            
+            let urgencyClass = 'zone-a';
+            if (maintenance.urgency === 'MEDIUM') urgencyClass = 'zone-b';
+            else if (maintenance.urgency === 'HIGH') urgencyClass = 'zone-c';
+            else if (maintenance.urgency === 'URGENT') urgencyClass = 'zone-d';
+            
+            // ENHANCED: Support both hours and days display
+            const timeUnit = maintenance.time_unit || 'hours';
+            let timeValue = maintenance.time_to_next || 0;
+            let timeLabel = '';
+            let timeDisplay = '';
+            
+            if (timeUnit === 'hours') {
+                if (timeValue < 1) {
+                    timeDisplay = `${Math.round(timeValue * 60)} min`;
+                } else if (timeValue < 24) {
+                    timeDisplay = `${timeValue.toFixed(1)}h`;
+                } else {
+                    const days = Math.floor(timeValue / 24);
+                    const hours = timeValue % 24;
+                    timeDisplay = `${days}d ${hours.toFixed(1)}h`;
+                }
+                timeLabel = `Hours to Zone ${maintenance.next_zone}`;
+            } else {
+                timeDisplay = `${timeValue} days`;
+                timeLabel = `Days to Zone ${maintenance.next_zone}`;
+            }
+            
+            const predHTML = `
+                <div class="pred-item">
+                    <div class="pred-time">Current Status</div>
+                    <div class="pred-value ${currentData.latest ? getZoneClass(currentData.latest.zone) : 'zone-a'}">
+                        Zone ${currentData.latest ? currentData.latest.zone : 'A'}
+                    </div>
+                    <div class="pred-desc">${mlEnhanced ? 'ML Enhanced' : 'Current condition'}</div>
+                </div>
+                <div class="pred-item">
+                    <div class="pred-time">${timeLabel}</div>
+                    <div class="pred-value ${getZoneClass(maintenance.next_zone)}">${timeDisplay}</div>
+                    <div class="pred-desc">${mlEnhanced ? 'AI Prediction' : 'Time remaining'}</div>
+                </div>
+                <div class="pred-item">
+                    <div class="pred-time">Priority Level</div>
+                    <div class="pred-value ${urgencyClass}">${maintenance.urgency}</div>
+                    <div class="pred-desc">Maintenance urgency</div>
+                </div>
+                <div class="pred-item">
+                    <div class="pred-time">${mlEnhanced ? 'ML Confidence' : 'Trend Analysis'}</div>
+                    <div class="pred-value">
+                        ${mlEnhanced ? 
+                            (currentData.mlPerformance ? currentData.mlPerformance.confidence.toUpperCase() : 'HIGH') : 
+                            (currentData.latest && currentData.latest.rms > 2.5 ? '📈 Rising' : '📊 Stable')
+                        }
+                    </div>
+                    <div class="pred-desc">${mlEnhanced ? 'Prediction quality' : 'Recent pattern'}</div>
+                </div>
+            `;
+            
+            predGrid.innerHTML = predHTML;
+            
+            // Show maintenance advice
+            const adviceDiv = document.getElementById('maintenanceAdvice');
+            const adviceText = document.getElementById('adviceText');
+            
+            if (maintenance.maintenance_advice) {
+                const enhancedAdvice = mlEnhanced ? 
+                    `🤖 AI Analysis: ${maintenance.maintenance_advice}` : 
+                    maintenance.maintenance_advice;
+                    
+                adviceText.textContent = enhancedAdvice;
+                adviceDiv.style.display = 'block';
+            } else {
+                adviceDiv.style.display = 'none';
+            }
+        }
+        
+        function getZoneClass(zone) {
+            switch(zone) {
+                case 'A': return 'zone-a';
+                case 'B': return 'zone-b';
+                case 'C': return 'zone-c';
+                case 'D': return 'zone-d';
+                default: return 'zone-a';
+            }
+        }
+        
+        function getZoneColor(zone) {
+            switch(zone) {
+                case 'A': return '#28a745';
+                case 'B': return '#ffc107';
+                case 'C': return '#fd7e14';
+                case 'D': return '#dc3545';
+                default: return '#28a745';
+            }
+        }
+        
+        function forceRefresh() {
+            console.log('📱 Force refresh triggered');
+            if (navigator.vibrate) {
+                navigator.vibrate([10, 50, 10]); // Pattern vibration
+            }
+            loadChartData();
+        }
+        
+        // ENHANCED: Handle real-time updates dari Kodular dengan support hours/days
+        function updateFromKodular(kodularData) {
+            if (kodularData) {
+                console.log('📱 Enhanced update from Kodular:', kodularData);
+                
+                currentData.latest = {
+                    rms: kodularData.rms || 0,
+                    zone: kodularData.zone || 'A',
+                    status: kodularData.status || 'Good'
+                };
+                currentData.timestamp = kodularData.time || new Date().toLocaleTimeString();
+                
+                // ENHANCED: Support both hours and days
+                currentData.maintenance = {
+                    next_zone: kodularData.next_zone || 'B',
+                    time_to_next: kodularData.hours_to_next_zone || (kodularData.days_to_next_zone * 24) || 720,
+                    time_unit: kodularData.time_unit || (kodularData.hours_to_next_zone ? 'hours' : 'days'),
+                    maintenance_advice: kodularData.maintenance_advice || 'Regular maintenance',
+                    urgency: kodularData.urgency || 'LOW',
+                    urgency_color: kodularData.urgency_color || 'green'
+                };
+                
+                // ENHANCED: Update ML status
+                mlEnhanced = kodularData.ml_enhanced || false;
+                
+                if (mlEnhanced) {
+                    currentData.mlPerformance = {
+                        improvement: kodularData.ml_accuracy_improvement || 0,
+                        method: kodularData.prediction_method || 'Hybrid ML',
+                        confidence: kodularData.confidence_level || 'medium',
+                        status: kodularData.ml_status || 'ACTIVE'
+                    };
+                }
+                
+                generateChartDataFromCurrent();
+                updateStatusDisplay();
+                updateMLPerformanceDisplay();
+                updateMaintenancePrediction();
+                drawChart();
+                
+                // Enhanced notification for critical status
+                if (kodularData.zone === 'D' && 'Notification' in window) {
+                    const mlIndicator = mlEnhanced ? '🤖 ML Alert: ' : '🚨 Alert: ';
+                    new Notification(`${mlIndicator}Critical Vibration!`, {
+                        body: `RMS: ${kodularData.rms} mm/s - Immediate action required`,
+                        icon: '/favicon.ico'
+                    });
+                }
+                
+                // Haptic feedback for zone changes
+                if (navigator.vibrate) {
+                    if (kodularData.zone === 'D') {
+                        navigator.vibrate([200, 100, 200, 100, 200]); // Emergency pattern
+                    } else if (kodularData.zone === 'C') {
+                        navigator.vibrate([100, 50, 100]); // Warning pattern
+                    }
+                }
+            }
+        }
+        
+        // Request notification permission on load
+        if ('Notification' in window && Notification.permission === 'default') {
+            Notification.requestPermission();
+        }
+        
+        // Service Worker for offline support
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/sw.js').catch(console.error);
+        }
+        
+        // Expose for Kodular
+        window.updateFromKodular = updateFromKodular;
+        
+        // ENHANCED: Expose ML status for Kodular dengan hours/days support
+        window.getMLStatus = function() {
+            return {
+                ml_enhanced: mlEnhanced,
+                performance: currentData.mlPerformance || null,
+                current_data: currentData.latest || null,
+                maintenance: currentData.maintenance || null,
+                time_unit: currentData.maintenance ? currentData.maintenance.time_unit : 'hours'
+            };
+        };
+        
+        // Handle orientation change
+        window.addEventListener('orientationchange', () => {
+            setTimeout(() => {
+                if (chart) {
+                    chart.draw(chart.getDataTable(), chart.getOptions());
+                }
+            }, 500);
+        });
+        
+        // Handle visibility change (app comes back to foreground)
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden) {
+                forceRefresh();
+            }
+        });
+        
+        // ENHANCED: Add ML performance monitoring
+        setInterval(() => {
+            if (mlEnhanced && currentData.mlPerformance) {
+                console.log('🤖 ML Status:', currentData.mlPerformance);
+            }
+        }, 60000); // Log ML status every minute
+        
+        // Add PWA install prompt handling
+        let deferredPrompt;
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            // Show install button if needed
+        });
+    </script>
+</body>
+</html>
