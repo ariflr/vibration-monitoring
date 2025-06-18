@@ -138,7 +138,7 @@
         
         .chart-container {
             width: 100%;
-            height: 300px;
+            height: 400px; /* INCREASED: dari 300px ke 400px */
             background: white;
             border-radius: 15px;
             margin-bottom: 15px;
@@ -261,17 +261,9 @@
             color: #888;
         }
         
+        /* ML Performance Section - REMOVED */
         .ml-performance {
-            margin: 15px;
-            background: linear-gradient(135deg, #e8f5e8 0%, #f0fff0 100%);
-            border-radius: 15px;
-            padding: 15px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-            display: none;
-        }
-        
-        .ml-performance.active {
-            display: block;
+            display: none !important; /* FORCE HIDE */
         }
         
         .ml-performance h4 {
@@ -443,7 +435,7 @@
             }
             
             .chart-container {
-                height: 250px;
+                height: 300px; /* RESPONSIVE: smaller on mobile */
             }
             
             .zone-legend {
@@ -466,7 +458,7 @@
         /* Landscape mode adjustments */
         @media (orientation: landscape) and (max-height: 600px) {
             .chart-container {
-                height: 200px;
+                height: 250px; /* RESPONSIVE: smaller in landscape */
             }
             
             .header {
@@ -545,28 +537,7 @@
             </div>
         </div>
         
-        <!-- ML Performance Section -->
-        <div class="ml-performance" id="mlPerformance">
-            <h4>🤖 ML Enhancement Active</h4>
-            <div class="ml-metrics">
-                <div class="ml-metric">
-                    <div class="ml-metric-value" id="mlImprovement">--</div>
-                    <div class="ml-metric-label">Accuracy Gain</div>
-                </div>
-                <div class="ml-metric">
-                    <div class="ml-metric-value" id="mlConfidence">--</div>
-                    <div class="ml-metric-label">Confidence</div>
-                </div>
-                <div class="ml-metric">
-                    <div class="ml-metric-value" id="mlMethod">--</div>
-                    <div class="ml-metric-label">Method</div>
-                </div>
-                <div class="ml-metric">
-                    <div class="ml-metric-value" id="mlAccuracy">--</div>
-                    <div class="ml-metric-label">ML Accuracy</div>
-                </div>
-            </div>
-        </div>
+        <!-- ML Performance Section - REMOVED for cleaner layout -->
         
         <div class="chart-section">
             <div class="chart-container">
@@ -1056,33 +1027,19 @@
         }
         
         function updateMLPerformanceDisplay() {
-            const mlPerformanceDiv = document.getElementById('mlPerformance');
+            // SIMPLIFIED: Only update badges, no performance section
             const mlBadge = document.getElementById('mlBadge');
             
             if (mlEnhanced && currentData.mlPerformance) {
-                const perf = currentData.mlPerformance;
-                
-                // Show ML performance section
-                mlPerformanceDiv.classList.add('active');
+                // Show ML badge only
                 mlBadge.classList.add('active');
-                
-                // Update ML metrics
-                document.getElementById('mlImprovement').textContent = `+${perf.improvement.toFixed(1)}%`;
-                document.getElementById('mlConfidence').textContent = perf.confidence.toUpperCase();
-                document.getElementById('mlMethod').textContent = perf.method;
-                
-                // Calculate accuracy from improvement
-                const baseAccuracy = 90; // Assume base 90% accuracy
-                const mlAccuracy = baseAccuracy + (perf.improvement * 0.3);
-                document.getElementById('mlAccuracy').textContent = `${mlAccuracy.toFixed(1)}%`;
                 
                 // Update predictions ML badge
                 const predMLBadge = document.getElementById('predMLBadge');
                 predMLBadge.classList.add('active');
                 
             } else {
-                // Hide ML performance section
-                mlPerformanceDiv.classList.remove('active');
+                // Hide ML badges
                 mlBadge.classList.remove('active');
                 
                 const predMLBadge = document.getElementById('predMLBadge');
