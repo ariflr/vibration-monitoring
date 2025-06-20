@@ -1,653 +1,9 @@
-</style>
-</head>
-<body>
-    <div class="container">
-        <div class="header">
-            <div class="sync-status" id="syncStatus">🔄 Connecting...</div>
-            <h1>🔧 Vibration Monitor</h1>
-            <p>FIXED Hours-Based Predictions & Chart Data</p>
-        </div>
-        
-        <div class="status-grid">
-            <div class="status-card">
-                <div class="status-value" id="currentRMS">Loading...</div>
-                <div class="status-label">RMS (mm/s)</div>
-            </div>
-            <div class="status-card">
-                <div class="status-value" id="currentZone">--</div>
-                <div class="status-label">Zone</div>
-            </div>
-            <div class="status-card">
-                <div class="status-value" id="currentStatus">--</div>
-                <div class="status-label">Status</div>
-            </div>
-            <div class="status-card">
-                <div class="status-value" id="lastUpdate">--</div>
-                <div class="status-label">Last Update</div>
-            </div>
-        </div>
-        
-        <div class="chart-section">
-            <div class="chart-container">
-                <div class="chart-loading" id="chartLoading">
-                    🔄 Loading FIXED Chart Data...
-                </div>
-                <div id="chartContainer"></div>
-            </div>
-            
-            <div class="zone-legend">
-                <div class="zone-legend-item">
-                    <div class="zone-dot zone-a"></div>
-                    <span>Zone A: Good (0-1.12)</span>
-                </div>
-                <div class="zone-legend-item">
-                    <div class="zone-dot zone-b"></div>
-                    <span>Zone B: Acceptable (1.12-4.5)</span>
-                </div>
-                <div class="zone-legend-item">
-                    <div class="zone-dot zone-c"></div>
-                    <span>Zone C: Caution (4.5-11.2)</span>
-                </div>
-                <div class="zone-legend-item">
-                    <div class="zone-dot zone-d"></div>
-                    <span>Zone D: Critical (>11.2)</span>
-                </div>
-            </div>
-        </div>
-        
-        <div class="predictions">
-            <div class="predictions-header">
-                🔮 FIXED Hours-Based Predictions
-            </div>
-            <div class="pred-grid" id="predGrid">
-                <div class="pred-item">
-                    <div class="pred-time">Loading...</div>
-                    <div class="pred-value">--</div>
-                    <div class="pred-desc">Please wait</div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="maintenance-card" id="maintenanceAdvice" style="display: none;">
-            <h4>⚠️ Maintenance Recommendation</h4>
-            <p id="adviceText">--</p>
-        </div>
-        
-        <div class="refresh-section">
-            <p style="font-size: 0.8rem; color: #666; margin-bottom: 10px;">
-                Real-time Firebase sync every 10s - HOURS focus
-            </p>
-            <button class="refresh-btn" onclick="forceRefresh()">
-                🔄 Force Refresh
-            </button>
-        </div>
-        
-        <div class="error-display" id="errorDisplay" style="display: none;">
-            <strong>Connection Error:</strong>
-            <div id="errorText">--</div>
-        </div>
-    </div>
-
-    <div class="debug-info" id="debugInfo">
-        <strong>FIXED Chart & Hours Debug:</strong><br>
-        Status: <span id="debugStatus">--</span><br>
-        RMS: <span id="debugRMS">--</span><br>
-        Chart Points: <span id="debugChart">--</span><br>
-        Hours to Next: <span id="debugHours">--</span><br>
-        Last Sync: <span id="debugTime">--</span><br>
-        Errors: <span id="debugErrors">0</span>
-    </div>
-
-    <script>
-        google.charts.load('current', {'packages':['corechart']});
-        google.charts.setOnLoadCallback(initializeApp);
-        
-        let chart;
-        let currentData = {};
-        let isLoading = false;
-        let errorCount = 0;
-        let lastSyncTime = null;
-        
-        // FIXED: Firebase URLs
-        const FIREBASE_URLS = {
-            current: 'https://predictive-maintenance-90034-default-rtdb.firebaseio.com/kodular_simple.json',
-            enhanced: 'https://predictive-maintenance-90034-default-rtdb.firebaseio.com/kodular_enhanced.json',
-            historical: 'https://predictive-maintenance-90034-default-rtdb.firebaseio.com/realtime/historical_rms.json',
-            maintenance: 'https://predictive-maintenance-90034-default-rtdb.firebaseio.com/maintenance_prediction/latest_prediction.json'
-        };
-        
-        function initializeApp() {
-            console.log('🚀 FIXED Dashboard initialized - Hours-Based & Chart Fix');
-            updateDebugInfo('STARTING', 0, 0, 0, 'Initializing...');
-            
-            const container = document.getElementById('chartContainer');
-            chart = new google.visualization.LineChart(container);
-            
-            // FIXED: Load real Firebase data immediately
-            loadRealFirebaseData();
-            
-            // FIXED: Real-time sync every 10 seconds
-            setInterval(loadRealFirebaseData, 10000);
-            
-            updateSyncStatus('🔄 Loading...', 'connecting');
-        }
-        
-        async function loadRealFirebaseData() {
-            if (isLoading) {
-                console.log('⏳ Already loading, skipping...');
-                return;
-            }
-            
-            isLoading = true;
-            console.log('🔄 FIXED: Loading Firebase data - Hours Focus & Chart Fix...');
-            updateSyncStatus('🔄 Syncing...', 'connecting');
-            
-            try {
-                // FIXED: Load all Firebase endpoints
-                const promises = [
-                    fetchWithTimeout(FIREBASE_URLS.current, 'current'),
-                    fetchWithTimeout(FIREBASE_URLS.enhanced, 'enhanced'), 
-                    fetchWithTimeout(FIREBASE_URLS.historical, 'historical'),
-                    fetchWithTimeout(FIREBASE_URLS.maintenance, 'maintenance')
-                ];
-                
-                const results = await Promise.allSettled(promises);
-                
-                // Process results
-                let hasValidData = false;
-                const firebaseData = {};
-                
-                results.forEach((result, index) => {
-                    const keys = ['current', 'enhanced', 'historical', 'maintenance'];
-                    const key = keys[index];
-                    
-                    if (result.status === 'fulfilled' && result.value.success) {
-                        firebaseData[key] = result.value.data;
-                        hasValidData = true;
-                        console.log(`✅ ${key} data loaded:`, result.value.data ? 'OK' : 'EMPTY');
-                    } else {
-                        console.log(`❌ ${key} failed:`, result.reason);
-                        firebaseData[key] = null;
-                    }
-                });
-                
-                if (hasValidData) {
-                    processFirebaseData(firebaseData);
-                    updateSyncStatus('✅ Connected', 'connected');
-                    errorCount = 0;
-                } else {
-                    throw new Error('No valid Firebase data received');
-                }
-                
-            } catch (error) {
-                console.error('❌ FIXED Firebase load error:', error);
-                errorCount++;
-                handleLoadError(error);
-                updateSyncStatus('❌ Error', 'error');
-            } finally {
-                isLoading = false;
-                lastSyncTime = new Date();
-                hideChartLoading();
-            }
-        }
-        
-        async function fetchWithTimeout(url, source) {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 8000);
-            
-            try {
-                const response = await fetch(url + '?t=' + Date.now(), {
-                    signal: controller.signal,
-                    headers: {
-                        'Cache-Control': 'no-cache',
-                        'Pragma': 'no-cache'
-                    }
-                });
-                
-                clearTimeout(timeoutId);
-                
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status} for ${source}`);
-                }
-                
-                const data = await response.json();
-                return { success: true, data: data, source: source };
-                
-            } catch (error) {
-                clearTimeout(timeoutId);
-                throw new Error(`${source}: ${error.message}`);
-            }
-        }
-        
-        function processFirebaseData(firebaseData) {
-            console.log('🔄 FIXED: Processing Firebase data - Hours & Chart...');
-            
-            try {
-                // FIXED: Process current data with hours focus
-                if (firebaseData.current) {
-                    const current = firebaseData.current;
-                    
-                    currentData.latest = {
-                        rms: parseFloat(current.rms) || 0,
-                        zone: current.zone || 'A',
-                        status: current.status || 'Good'
-                    };
-                    
-                    currentData.timestamp = current.time || new Date().toLocaleTimeString().slice(0, 8);
-                    
-                    // FIXED: Get HOURS-based maintenance prediction
-                    if (firebaseData.maintenance || current.hours_to_next_zone !== undefined) {
-                        const maintenance = firebaseData.maintenance || current;
-                        
-                        currentData.maintenance = {
-                            next_zone: maintenance.next_zone || current.next_zone || 'B',
-                            hours_to_next: parseFloat(maintenance.hours_to_next_zone || current.hours_to_next_zone) || 24,
-                            time_display: maintenance.time_to_next_zone_display || current.time_to_next_zone_display || '24h',
-                            maintenance_advice: maintenance.maintenance_advice || current.maintenance_advice || 'Regular maintenance',
-                            urgency: maintenance.urgency || current.urgency || 'LOW',
-                            urgency_color: maintenance.urgency_color || current.urgency_color || 'green',
-                            prediction_unit: 'hours'  // FIXED: Ensure hours focus
-                        };
-                    }
-                    
-                    console.log('✅ Current data processed:', currentData.latest);
-                    console.log('🔧 HOURS Maintenance data:', currentData.maintenance);
-                }
-                
-                // FIXED: Process historical data for chart
-                if (firebaseData.historical) {
-                    processHistoricalDataFixed(firebaseData.historical);
-                } else {
-                    console.log('⚠️ No historical data, generating from current...');
-                    generateChartFromCurrentFixed();
-                }
-                
-                // Update all displays
-                updateStatusDisplay();
-                updatePredictionsDisplayHours();
-                updateMaintenanceDisplay();
-                drawChartFixed();
-                
-                const rms = currentData.latest ? currentData.latest.rms : 0;
-                const chartPoints = currentData.chartData ? currentData.chartData.length : 0;
-                const hoursToNext = currentData.maintenance ? currentData.maintenance.hours_to_next : 0;
-                updateDebugInfo('CONNECTED', rms, chartPoints, hoursToNext, new Date().toLocaleTimeString());
-                
-            } catch (error) {
-                console.error('❌ Data processing error:', error);
-                throw error;
-            }
-        }
-        
-        function processHistoricalDataFixed(historical) {
-            console.log('📊 FIXED: Processing historical data for chart...');
-            
-            if (!historical || typeof historical !== 'object') {
-                console.log('⚠️ Invalid historical data format');
-                generateChartFromCurrentFixed();
-                return;
-            }
-            
-            const entries = Object.entries(historical);
-            console.log(`📈 Found ${entries.length} historical entries`);
-            
-            if (entries.length === 0) {
-                generateChartFromCurrentFixed();
-                return;
-            }
-            
-            // FIXED: Sort by key (timestamp), take last 60 points
-            entries.sort((a, b) => a[0].localeCompare(b[0])); // Chronological order
-            const last60 = entries.slice(-60); // Take last 60
-            
-            const chartData = [];
-            
-            last60.forEach(([key, data]) => {
-                if (data && typeof data === 'object' && data.chart_ready) {
-                    const rms = parseFloat(data.rms);
-                    const time = data.time;
-                    const zone = data.zone;
-                    
-                    // FIXED: Validate data before adding
-                    if (!isNaN(rms) && time && zone) {
-                        chartData.push({
-                            time: time,
-                            rms: rms,
-                            zone: zone,
-                            timestamp: data.full_timestamp || key,
-                            source: 'firebase_historical'
-                        });
-                    }
-                }
-            });
-            
-            if (chartData.length > 0) {
-                currentData.chartData = chartData;
-                console.log(`✅ FIXED Chart data loaded: ${chartData.length} points`);
-                console.log(`🕒 Time range: ${chartData[0].time} to ${chartData[chartData.length-1].time}`);
-                console.log(`📊 RMS range: ${Math.min(...chartData.map(d => d.rms)).toFixed(2)} to ${Math.max(...chartData.map(d => d.rms)).toFixed(2)}`);
-            } else {
-                console.log('⚠️ No valid chart data found, generating from current');
-                generateChartFromCurrentFixed();
-            }
-        }
-        
-        function generateChartFromCurrentFixed() {
-            if (!currentData.latest) {
-                console.log('⚠️ No current data for chart generation');
-                return;
-            }
-            
-            console.log('🔄 FIXED: Generating chart from current RMS:', currentData.latest.rms);
-            
-            const baseRMS = currentData.latest.rms;
-            const chartData = [];
-            const now = new Date();
-            
-            // Generate 60 points leading to current time
-            for (let i = 0; i < 60; i++) {
-                const timeAgo = new Date(now.getTime() - (59 - i) * 60000); // 1 minute intervals
-                const variation = Math.sin(i * 0.1) * 0.1 + (Math.random() - 0.5) * 0.05;
-                let rms = Math.max(0.1, baseRMS + variation);
-                
-                // Last point = exact current RMS
-                if (i === 59) {
-                    rms = baseRMS;
-                }
-                
-                let zone = 'A';
-                if (rms >= 1.12) zone = 'B';
-                if (rms >= 4.5) zone = 'C';
-                if (rms >= 11.2) zone = 'D';
-                
-                chartData.push({
-                    time: timeAgo.getHours().toString().padStart(2, '0') + ':' + timeAgo.getMinutes().toString().padStart(2, '0'),
-                    rms: Math.round(rms * 100) / 100,
-                    zone: zone,
-                    source: 'generated'
-                });
-            }
-            
-            currentData.chartData = chartData;
-            console.log(`✅ FIXED Generated ${chartData.length} chart points ending with RMS: ${baseRMS}`);
-        }
-        
-        function updateStatusDisplay() {
-            if (!currentData.latest) return;
-            
-            const latest = currentData.latest;
-            
-            document.getElementById('currentRMS').textContent = latest.rms.toFixed(2);
-            document.getElementById('currentZone').textContent = latest.zone;
-            document.getElementById('lastUpdate').textContent = currentData.timestamp || '--:--';
-            
-            let status = 'Good';
-            let statusClass = 'zone-a';
-            
-            switch(latest.zone) {
-                case 'B':
-                    status = 'OK';
-                    statusClass = 'zone-b';
-                    break;
-                case 'C':
-                    status = 'Warning';
-                    statusClass = 'zone-c';
-                    break;
-                case 'D':
-                    status = 'Critical';
-                    statusClass = 'zone-d';
-                    break;
-            }
-            
-            const statusElement = document.getElementById('currentStatus');
-            statusElement.textContent = status;
-            statusElement.className = `status-value ${statusClass}`;
-            
-            const zoneElement = document.getElementById('currentZone');
-            zoneElement.className = `status-value ${statusClass}`;
-            
-            console.log(`📊 Status updated: ${latest.rms.toFixed(2)} mm/s, Zone ${latest.zone}, ${status}`);
-        }
-        
-        function updatePredictionsDisplayHours() {
-            const predGrid = document.getElementById('predGrid');
-            
-            if (!currentData.latest || !currentData.maintenance) {
-                predGrid.innerHTML = '<div class="pred-item"><div class="pred-time">No Data</div><div class="pred-value">--</div></div>';
-                return;
-            }
-            
-            const latest = currentData.latest;
-            const maintenance = currentData.maintenance;
-            
-            // FIXED: Format HOURS display properly
-            let timeDisplay = maintenance.time_display || `${maintenance.hours_to_next.toFixed(1)}h`;
-            
-            // FIXED: Convert hours to user-friendly format - FOCUS ON HOURS
-            if (maintenance.hours_to_next < 1) {
-                timeDisplay = `${Math.round(maintenance.hours_to_next * 60)}min`;
-            } else if (maintenance.hours_to_next < 24) {
-                timeDisplay = `${maintenance.hours_to_next.toFixed(1)}h`;
-            } else if (maintenance.hours_to_next < 168) { // Less than 1 week
-                const days = Math.floor(maintenance.hours_to_next / 24);
-                const hours = maintenance.hours_to_next % 24;
-                timeDisplay = `${days}d ${hours.toFixed(1)}h`;
-            } else {
-                timeDisplay = `${Math.floor(maintenance.hours_to_next / 24)}d`;
-            }
-            
-            let urgencyClass = 'zone-a';
-            switch(maintenance.urgency) {
-                case 'MEDIUM': urgencyClass = 'zone-b'; break;
-                case 'HIGH': urgencyClass = 'zone-c'; break;
-                case 'CRITICAL': case 'URGENT': urgencyClass = 'zone-d'; break;
-            }
-            
-            // FIXED: Calculate degradation rate per hour for display
-            let degradationRate = 'Stable';
-            if (currentData.chartData && currentData.chartData.length >= 2) {
-                const recent = currentData.chartData.slice(-10);
-                const trend = recent[recent.length-1].rms - recent[0].rms;
-                if (trend > 0.1) degradationRate = '📈 Rising';
-                else if (trend < -0.1) degradationRate = '📉 Improving';
-                else degradationRate = '📊 Stable';
-            }
-            
-            const predHTML = `
-                <div class="pred-item">
-                    <div class="pred-time">Current Status</div>
-                    <div class="pred-value ${getZoneClass(latest.zone)}">Zone ${latest.zone}</div>
-                    <div class="pred-desc">${latest.rms.toFixed(2)} mm/s</div>
-                </div>
-                <div class="pred-item">
-                    <div class="pred-time">Hours to Zone ${maintenance.next_zone}</div>
-                    <div class="pred-value ${getZoneClass(maintenance.next_zone)}">${timeDisplay}</div>
-                    <div class="pred-desc">HOURS-based prediction</div>
-                </div>
-                <div class="pred-item">
-                    <div class="pred-time">Priority Level</div>
-                    <div class="pred-value ${urgencyClass}">${maintenance.urgency}</div>
-                    <div class="pred-desc">Maintenance urgency</div>
-                </div>
-                <div class="pred-item">
-                    <div class="pred-time">Trend Analysis</div>
-                    <div class="pred-value">${degradationRate}</div>
-                    <div class="pred-desc">Recent pattern</div>
-                </div>
-            `;
-            
-            predGrid.innerHTML = predHTML;
-            console.log(`🔮 FIXED Hours predictions: Zone ${latest.zone} → ${maintenance.next_zone} in ${timeDisplay} (${maintenance.hours_to_next.toFixed(1)}h)`);
-        }
-        
-        function updateMaintenanceDisplay() {
-            const adviceDiv = document.getElementById('maintenanceAdvice');
-            const adviceText = document.getElementById('adviceText');
-            
-            if (currentData.maintenance && currentData.maintenance.maintenance_advice) {
-                adviceText.textContent = currentData.maintenance.maintenance_advice;
-                adviceDiv.style.display = 'block';
-            } else {
-                adviceDiv.style.display = 'none';
-            }
-        }
-        
-        function drawChartFixed() {
-            if (!currentData.chartData || currentData.chartData.length === 0) {
-                console.log('❌ No chart data to draw');
-                return;
-            }
-            
-            console.log(`📊 FIXED: Drawing chart with ${currentData.chartData.length} points`);
-            
-            const data = new google.visualization.DataTable();
-            data.addColumn('string', 'Time');
-            data.addColumn('number', 'RMS (mm/s)');
-            data.addColumn({type: 'string', role: 'style'});
-            
-            currentData.chartData.forEach(point => {
-                let color = '#28a745'; // Zone A - Green
-                if (point.zone === 'B') color = '#ffc107'; // Zone B - Yellow
-                else if (point.zone === 'C') color = '#fd7e14'; // Zone C - Orange
-                else if (point.zone === 'D') color = '#dc3545'; // Zone D - Red
-                
-                data.addRow([
-                    point.time,
-                    point.rms,
-                    `color: ${color}; point-size: 4`
-                ]);
-            });
-            
-            const options = {
-                title: 'FIXED Real-time Vibration Trend (Hours-Based System)',
-                titleTextStyle: {
-                    fontSize: 16,
-                    bold: true,
-                    color: '#333'
-                },
-                hAxis: {
-                    title: 'Time (HH:MM)',
-                    titleTextStyle: {fontSize: 12},
-                    textStyle: {fontSize: 10},
-                    slantedText: true,
-                    slantedTextAngle: 30,
-                    showTextEvery: Math.max(1, Math.floor(currentData.chartData.length / 12))
-                },
-                vAxis: {
-                    title: 'RMS (mm/s)',
-                    titleTextStyle: {fontSize: 12},
-                    textStyle: {fontSize: 10},
-                    minValue: 0,
-                    gridlines: {
-                        color: '#e0e0e0',
-                        count: 6
-                    }
-                },
-                legend: 'none',
-                pointSize: 4,
-                lineWidth: 2,
-                backgroundColor: '#ffffff',
-                chartArea: {
-                    left: 60,
-                    top: 50,
-                    width: '85%',
-                    height: '75%'
-                },
-                colors: ['#007bff'],
-                curveType: 'function',
-                animation: {
-                    duration: 1000,
-                    easing: 'out'
-                }
-            };
-            
-            try {
-                chart.draw(data, options);
-                console.log('✅ FIXED Chart drawn successfully');
-            } catch (error) {
-                console.error('❌ Chart drawing error:', error);
-            }
-        }
-        
-        function getZoneClass(zone) {
-            switch(zone) {
-                case 'A': return 'zone-a';
-                case 'B': return 'zone-b';
-                case 'C': return 'zone-c';
-                case 'D': return 'zone-d';
-                default: return 'zone-a';
-            }
-        }
-        
-        function updateSyncStatus(text, className) {
-            const syncStatus = document.getElementById('syncStatus');
-            syncStatus.textContent = text;
-            syncStatus.className = `sync-status ${className}`;
-        }
-        
-        function hideChartLoading() {
-            const loading = document.getElementById('chartLoading');
-            if (loading) {
-                loading.style.display = 'none';
-            }
-        }
-        
-        function handleLoadError(error) {
-            console.error('❌ Load error:', error);
-            
-            const errorDisplay = document.getElementById('errorDisplay');
-            const errorText = document.getElementById('errorText');
-            
-            errorText.textContent = error.message || 'Unknown error';
-            errorDisplay.style.display = 'block';
-            
-            setTimeout(() => {
-                errorDisplay.style.display = 'none';
-            }, 10000);
-            
-            updateDebugInfo('ERROR', 0, 0, 0, error.message);
-        }
-        
-        function updateDebugInfo(status, rms, chartPoints, hoursToNext, time) {
-            document.getElementById('debugStatus').textContent = status;
-            document.getElementById('debugRMS').textContent = rms.toFixed ? rms.toFixed(2) : rms;
-            document.getElementById('debugChart').textContent = chartPoints;
-            document.getElementById('debugHours').textContent = hoursToNext.toFixed ? hoursToNext.toFixed(1) + 'h' : hoursToNext;
-            document.getElementById('debugTime').textContent = time;
-            document.getElementById('debugErrors').textContent = errorCount;
-        }
-        
-        function forceRefresh() {
-            console.log('🔄 FIXED: Force refresh triggered');
-            if (navigator.vibrate) {
-                navigator.vibrate([10, 50, 10]);
-            }
-            
-            currentData = {};
-            document.getElementById('chartLoading').style.display = 'block';
-            updateSyncStatus('🔄 Refreshing...', 'connecting');
-            loadRealFirebaseData();
-        }
-        
-        // ENHANCED: Real-time update for external calls
-        window.updateFromKodular = function(kodularData) {
-            if (kodularData) {
-                console.log('📱 FIXED: Real-time update from Kodular (Hours-based):', kodularData);
-                
-                currentData.latest = {
-                    rms: kodularData.rms || 0,
-                    zone: kodularData.zone || 'A',
-                    status: kodularData.status || 'Good'
-                };
-                
-                currentData.timestamp = kodularData.time || new Date().toLocaleTimeString().slice(0, 8);
-                
-                if (kodular<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FIXED Dashboard - Hours-Based Predictions & Chart</title>
+    <title>Predictive Maintenance Based on Motor Vibration</title>
     <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
     <style>
         * {
@@ -702,13 +58,13 @@
         }
         
         .header h1 {
-            font-size: 1.5rem;
+            font-size: 1.4rem;
             margin-bottom: 5px;
             font-weight: 700;
         }
         
         .header p {
-            font-size: 0.9rem;
+            font-size: 0.85rem;
             opacity: 0.9;
         }
         
@@ -831,26 +187,26 @@
         
         .pred-item {
             background: white;
-            padding: 15px;
+            padding: 20px;
             text-align: center;
         }
         
         .pred-time {
-            font-size: 0.75rem;
+            font-size: 0.8rem;
             color: #666;
-            margin-bottom: 8px;
+            margin-bottom: 10px;
             font-weight: 600;
             text-transform: uppercase;
         }
         
         .pred-value {
-            font-size: 1.2rem;
+            font-size: 1.4rem;
             font-weight: bold;
-            margin-bottom: 5px;
+            margin-bottom: 8px;
         }
         
         .pred-desc {
-            font-size: 0.7rem;
+            font-size: 0.75rem;
             color: #888;
         }
         
@@ -920,3 +276,516 @@
             font-size: 0.8rem;
             border-left: 4px solid #c62828;
         }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="sync-status" id="syncStatus">🔄 Connecting...</div>
+            <h1>🔧 Predictive Maintenance Based on Motor Vibration</h1>
+            <p>Real-time Monitoring & Analysis System</p>
+        </div>
+        
+        <div class="status-grid">
+            <div class="status-card">
+                <div class="status-value" id="currentRMS">Loading...</div>
+                <div class="status-label">RMS (mm/s)</div>
+            </div>
+            <div class="status-card">
+                <div class="status-value" id="currentZone">--</div>
+                <div class="status-label">Zone</div>
+            </div>
+            <div class="status-card">
+                <div class="status-value" id="currentStatus">--</div>
+                <div class="status-label">Status</div>
+            </div>
+            <div class="status-card">
+                <div class="status-value" id="lastUpdate">--</div>
+                <div class="status-label">Last Update</div>
+            </div>
+        </div>
+        
+        <div class="chart-section">
+            <div class="chart-container">
+                <div class="chart-loading" id="chartLoading">
+                    🔄 Loading Chart Data...
+                </div>
+                <div id="chartContainer"></div>
+            </div>
+            
+            <div class="zone-legend">
+                <div class="zone-legend-item">
+                    <div class="zone-dot zone-a"></div>
+                    <span>Zone A: Good (0-1.12)</span>
+                </div>
+                <div class="zone-legend-item">
+                    <div class="zone-dot zone-b"></div>
+                    <span>Zone B: Acceptable (1.12-4.5)</span>
+                </div>
+                <div class="zone-legend-item">
+                    <div class="zone-dot zone-c"></div>
+                    <span>Zone C: Caution (4.5-11.2)</span>
+                </div>
+                <div class="zone-legend-item">
+                    <div class="zone-dot zone-d"></div>
+                    <span>Zone D: Critical (>11.2)</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="predictions">
+            <div class="predictions-header">
+                🔮 Prediction and Recommendation Maintenance
+            </div>
+            <div class="pred-grid" id="predGrid">
+                <div class="pred-item">
+                    <div class="pred-time">Hours to Next Zone</div>
+                    <div class="pred-value" id="hoursToNext">--</div>
+                    <div class="pred-desc">--</div>
+                </div>
+                <div class="pred-item">
+                    <div class="pred-time">Recommendation Maintenance</div>
+                    <div class="pred-value" id="maintenanceInterval">--</div>
+                    <div class="pred-desc">--</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="maintenance-card" id="maintenanceAdvice" style="display: none;">
+            <h4>⚠️ Maintenance Recommendation</h4>
+            <p id="adviceText">--</p>
+        </div>
+        
+        <div class="refresh-section">
+            <p style="font-size: 0.8rem; color: #666; margin-bottom: 10px;">
+                Real-time Firebase sync every 10s
+            </p>
+            <button class="refresh-btn" onclick="forceRefresh()">
+                🔄 Force Refresh
+            </button>
+        </div>
+        
+        <div class="error-display" id="errorDisplay" style="display: none;">
+            <strong>Connection Error:</strong>
+            <div id="errorText">--</div>
+        </div>
+    </div>
+
+    <div class="debug-info" id="debugInfo">
+        <strong>Prediction Monitoring Debug:</strong><br>
+        Status: <span id="debugStatus">--</span><br>
+        RMS: <span id="debugRMS">--</span><br>
+        Chart Points: <span id="debugChart">--</span><br>
+        Hours to Next: <span id="debugHours">--</span><br>
+        Maintenance: <span id="debugMaintenance">--</span><br>
+        Last Sync: <span id="debugTime">--</span><br>
+        Errors: <span id="debugErrors">0</span>
+    </div>
+
+    <script>
+        google.charts.load('current', {'packages':['corechart']});
+        google.charts.setOnLoadCallback(initializeApp);
+        
+        let chart;
+        let currentData = {};
+        let isLoading = false;
+        let errorCount = 0;
+        let lastSyncTime = null;
+        
+        // Firebase URLs
+        const FIREBASE_URLS = {
+            current: 'https://predictive-maintenance-90034-default-rtdb.firebaseio.com/kodular_simple.json',
+            enhanced: 'https://predictive-maintenance-90034-default-rtdb.firebaseio.com/kodular_enhanced.json',
+            historical: 'https://predictive-maintenance-90034-default-rtdb.firebaseio.com/realtime/historical_rms.json',
+            maintenance: 'https://predictive-maintenance-90034-default-rtdb.firebaseio.com/maintenance_prediction/latest_prediction.json'
+        };
+        
+        function initializeApp() {
+            console.log('🚀 Predictive Maintenance Dashboard initialized');
+            updateDebugInfo('STARTING', 0, 0, 0, '--', 'Initializing...');
+            
+            const container = document.getElementById('chartContainer');
+            chart = new google.visualization.LineChart(container);
+            
+            // Load real Firebase data immediately
+            loadRealFirebaseData();
+            
+            // Real-time sync every 10 seconds
+            setInterval(loadRealFirebaseData, 10000);
+            
+            updateSyncStatus('🔄 Loading...', 'connecting');
+        }
+        
+        async function loadRealFirebaseData() {
+            if (isLoading) {
+                console.log('⏳ Already loading, skipping...');
+                return;
+            }
+            
+            isLoading = true;
+            console.log('🔄 Loading Firebase data...');
+            updateSyncStatus('🔄 Syncing...', 'connecting');
+            
+            try {
+                console.log('📡 Fetching Firebase data...');
+                
+                // Load all Firebase endpoints
+                const promises = [
+                    fetchWithTimeout(FIREBASE_URLS.current, 'current'),
+                    fetchWithTimeout(FIREBASE_URLS.enhanced, 'enhanced'), 
+                    fetchWithTimeout(FIREBASE_URLS.historical, 'historical'),
+                    fetchWithTimeout(FIREBASE_URLS.maintenance, 'maintenance')
+                ];
+                
+                const results = await Promise.allSettled(promises);
+                
+                // Process results
+                let hasValidData = false;
+                const firebaseData = {};
+                
+                results.forEach((result, index) => {
+                    const keys = ['current', 'enhanced', 'historical', 'maintenance'];
+                    const key = keys[index];
+                    
+                    if (result.status === 'fulfilled' && result.value.success) {
+                        firebaseData[key] = result.value.data;
+                        hasValidData = true;
+                        console.log(`✅ ${key} data loaded:`, result.value.data ? 'HAS DATA' : 'EMPTY');
+                        
+                        // Log sample data for debugging
+                        if (result.value.data && key === 'current') {
+                            console.log('📊 Current data sample:', {
+                                rms: result.value.data.rms,
+                                zone: result.value.data.zone,
+                                timestamp: result.value.data.timestamp
+                            });
+                        }
+                    } else {
+                        console.log(`❌ ${key} failed:`, result.reason);
+                        firebaseData[key] = null;
+                    }
+                });
+                
+                if (hasValidData) {
+                    console.log('✅ Processing valid Firebase data...');
+                    processFirebaseData(firebaseData);
+                    updateSyncStatus('✅ Connected', 'connected');
+                    errorCount = 0;
+                } else {
+                    throw new Error('No valid Firebase data received');
+                }
+                
+            } catch (error) {
+                console.error('❌ Firebase load error:', error);
+                errorCount++;
+                handleLoadError(error);
+                updateSyncStatus('❌ Error', 'error');
+            } finally {
+                isLoading = false;
+                lastSyncTime = new Date();
+                hideChartLoading();
+            }
+        }
+        
+        async function fetchWithTimeout(url, source) {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 8000);
+            
+            try {
+                const response = await fetch(url + '?t=' + Date.now(), {
+                    signal: controller.signal,
+                    headers: {
+                        'Cache-Control': 'no-cache',
+                        'Pragma': 'no-cache'
+                    }
+                });
+                
+                clearTimeout(timeoutId);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status} for ${source}`);
+                }
+                
+                const data = await response.json();
+                return { success: true, data: data, source: source };
+                
+            } catch (error) {
+                clearTimeout(timeoutId);
+                throw new Error(`${source}: ${error.message}`);
+            }
+        }
+        
+        function processFirebaseData(firebaseData) {
+            console.log('🔄 Processing Firebase data...');
+            
+            try {
+                // Process current data with better error handling
+                if (firebaseData.current) {
+                    const current = firebaseData.current;
+                    console.log('📊 Raw current data:', current);
+                    
+                    currentData.latest = {
+                        rms: parseFloat(current.rms) || 0,
+                        zone: current.zone || 'A',
+                        status: current.status || 'Good'
+                    };
+                    
+                    currentData.timestamp = current.time || new Date().toLocaleTimeString().slice(0, 8);
+                    
+                    // Get maintenance data with fallbacks
+                    if (firebaseData.maintenance || current.hours_to_next_zone !== undefined) {
+                        const maintenance = firebaseData.maintenance || current;
+                        
+                        currentData.maintenance = {
+                            // ML PREDICTION DATA
+                            next_zone: maintenance.next_zone || current.next_zone || 'B',
+                            hours_to_next: parseFloat(maintenance.hours_to_next_zone || current.hours_to_next_zone) || 24,
+                            time_display: maintenance.time_to_next_zone_display || current.time_to_next_zone_display || '24h',
+                            
+                            // MAINTENANCE RECOMMENDATION DATA
+                            maintenance_interval_display: getMaintenanceInterval(currentData.latest.zone),
+                            maintenance_advice: getMaintenanceAdvice(currentData.latest.zone),
+                            maintenance_urgency: getMaintenanceUrgency(currentData.latest.zone),
+                            
+                            // LEGACY SUPPORT
+                            urgency: current.urgency || maintenance.urgency || 'NORMAL',
+                            urgency_color: current.urgency_color || maintenance.urgency_color || 'green'
+                        };
+                        
+                        console.log('🔧 Maintenance data processed:', currentData.maintenance);
+                    } else {
+                        // Fallback maintenance data
+                        currentData.maintenance = {
+                            next_zone: 'B',
+                            hours_to_next: 24,
+                            time_display: '24h',
+                            maintenance_interval_display: getMaintenanceInterval(currentData.latest.zone),
+                            maintenance_advice: getMaintenanceAdvice(currentData.latest.zone),
+                            maintenance_urgency: getMaintenanceUrgency(currentData.latest.zone),
+                            urgency: 'NORMAL',
+                            urgency_color: 'green'
+                        };
+                        console.log('⚠️ Using fallback maintenance data');
+                    }
+                    
+                    console.log('✅ Current data processed:', currentData.latest);
+                } else {
+                    console.log('⚠️ No current data available - using test data');
+                    // Use test data for demo
+                    currentData.latest = {rms: 2.3, zone: 'B', status: 'Acceptable'};
+                    currentData.maintenance = {
+                        next_zone: 'C', hours_to_next: 72, time_display: '3d',
+                        maintenance_interval_display: '3 months',
+                        maintenance_advice: 'Jadwalkan perawatan dalam 3 bulan'
+                    };
+                }
+                
+                // Process historical data for chart
+                if (firebaseData.historical) {
+                    processHistoricalData(firebaseData.historical);
+                } else {
+                    console.log('⚠️ No historical data, generating from current...');
+                    generateChartFromCurrent();
+                }
+                
+                // Update all displays
+                updateStatusDisplay();
+                updatePredictionDisplay();
+                updateMaintenanceDisplay();
+                drawChart();
+                
+                const rms = currentData.latest ? currentData.latest.rms : 0;
+                const chartPoints = currentData.chartData ? currentData.chartData.length : 0;
+                const hoursToNext = currentData.maintenance ? currentData.maintenance.hours_to_next : 0;
+                const maintenanceInterval = currentData.maintenance ? currentData.maintenance.maintenance_interval_display : '--';
+                updateDebugInfo('CONNECTED', rms, chartPoints, hoursToNext, maintenanceInterval, new Date().toLocaleTimeString());
+                
+            } catch (error) {
+                console.error('❌ Data processing error:', error);
+                throw error;
+            }
+        }
+        
+        function getMaintenanceInterval(zone) {
+            const intervals = {
+                'A': '6 months',
+                'B': '3 months', 
+                'C': '2-4 weeks',
+                'D': '24-72 hours'
+            };
+            return intervals[zone] || '6 months';
+        }
+        
+        function getMaintenanceAdvice(zone) {
+            const advice = {
+                'A': 'Perawatan preventif dalam 6 bulan',
+                'B': 'Jadwalkan perawatan dalam 3 bulan',
+                'C': 'Perawatan korektif diperlukan dalam 2-4 minggu',
+                'D': 'DARURAT: Rencanakan perawatan dalam 24-72 jam'
+            };
+            return advice[zone] || 'Regular maintenance';
+        }
+        
+        function getMaintenanceUrgency(zone) {
+            const urgency = {
+                'A': 'NORMAL',
+                'B': 'LOW',
+                'C': 'MEDIUM',
+                'D': 'CRITICAL'
+            };
+            return urgency[zone] || 'NORMAL';
+        }
+        
+        function processHistoricalData(historical) {
+            console.log('📊 Processing historical data for chart...');
+            
+            if (!historical || typeof historical !== 'object') {
+                console.log('⚠️ Invalid historical data format');
+                generateChartFromCurrent();
+                return;
+            }
+            
+            const entries = Object.entries(historical);
+            console.log(`📈 Found ${entries.length} historical entries`);
+            
+            if (entries.length === 0) {
+                generateChartFromCurrent();
+                return;
+            }
+            
+            // Sort by key (timestamp), take last 60 points
+            entries.sort((a, b) => a[0].localeCompare(b[0])); // Chronological order
+            const last60 = entries.slice(-60); // Take last 60
+            
+            const chartData = [];
+            
+            last60.forEach(([key, data]) => {
+                if (data && typeof data === 'object' && data.chart_ready) {
+                    const rms = parseFloat(data.rms);
+                    const time = data.time;
+                    const zone = data.zone;
+                    
+                    // Validate data before adding
+                    if (!isNaN(rms) && time && zone) {
+                        chartData.push({
+                            time: time,
+                            rms: rms,
+                            zone: zone,
+                            timestamp: data.full_timestamp || key,
+                            source: 'firebase_historical'
+                        });
+                    }
+                }
+            });
+            
+            if (chartData.length > 0) {
+                currentData.chartData = chartData;
+                console.log(`✅ Chart data loaded: ${chartData.length} points`);
+                console.log(`🕒 Time range: ${chartData[0].time} to ${chartData[chartData.length-1].time}`);
+                console.log(`📊 RMS range: ${Math.min(...chartData.map(d => d.rms)).toFixed(2)} to ${Math.max(...chartData.map(d => d.rms)).toFixed(2)}`);
+            } else {
+                console.log('⚠️ No valid chart data found, generating from current');
+                generateChartFromCurrent();
+            }
+        }
+        
+        function generateChartFromCurrent() {
+            if (!currentData.latest) {
+                console.log('⚠️ No current data for chart generation');
+                return;
+            }
+            
+            console.log('🔄 Generating chart from current RMS:', currentData.latest.rms);
+            
+            const baseRMS = currentData.latest.rms;
+            const chartData = [];
+            const now = new Date();
+            
+            // Generate 60 points leading to current time
+            for (let i = 0; i < 60; i++) {
+                const timeAgo = new Date(now.getTime() - (59 - i) * 60000); // 1 minute intervals
+                const variation = Math.sin(i * 0.1) * 0.1 + (Math.random() - 0.5) * 0.05;
+                let rms = Math.max(0.1, baseRMS + variation);
+                
+                // Last point = exact current RMS
+                if (i === 59) {
+                    rms = baseRMS;
+                }
+                
+                let zone = 'A';
+                if (rms >= 1.12) zone = 'B';
+                if (rms >= 4.5) zone = 'C';
+                if (rms >= 11.2) zone = 'D';
+                
+                chartData.push({
+                    time: timeAgo.getHours().toString().padStart(2, '0') + ':' + timeAgo.getMinutes().toString().padStart(2, '0'),
+                    rms: Math.round(rms * 100) / 100,
+                    zone: zone,
+                    source: 'generated'
+                });
+            }
+            
+            currentData.chartData = chartData;
+            console.log(`✅ Generated ${chartData.length} chart points ending with RMS: ${baseRMS}`);
+        }
+        
+        function updateStatusDisplay() {
+            if (!currentData.latest) return;
+            
+            const latest = currentData.latest;
+            
+            document.getElementById('currentRMS').textContent = latest.rms.toFixed(2);
+            document.getElementById('currentZone').textContent = latest.zone;
+            document.getElementById('lastUpdate').textContent = currentData.timestamp || '--:--';
+            
+            let status = 'Good';
+            let statusClass = 'zone-a';
+            
+            switch(latest.zone) {
+                case 'B':
+                    status = 'OK';
+                    statusClass = 'zone-b';
+                    break;
+                case 'C':
+                    status = 'Warning';
+                    statusClass = 'zone-c';
+                    break;
+                case 'D':
+                    status = 'Critical';
+                    statusClass = 'zone-d';
+                    break;
+            }
+            
+            const statusElement = document.getElementById('currentStatus');
+            statusElement.textContent = status;
+            statusElement.className = `status-value ${statusClass}`;
+            
+            const zoneElement = document.getElementById('currentZone');
+            zoneElement.className = `status-value ${statusClass}`;
+            
+            console.log(`📊 Status updated: ${latest.rms.toFixed(2)} mm/s, Zone ${latest.zone}, ${status}`);
+        }
+        
+        function updatePredictionDisplay() {
+            if (!currentData.latest || !currentData.maintenance) return;
+            
+            const maintenance = currentData.maintenance;
+            
+            // Update Hours to Next Zone
+            let hoursDisplay = maintenance.time_display || `${maintenance.hours_to_next.toFixed(1)}h`;
+            
+            // Format hours display
+            if (maintenance.hours_to_next < 1) {
+                hoursDisplay = `${Math.round(maintenance.hours_to_next * 60)}min`;
+            } else if (maintenance.hours_to_next < 24) {
+                hoursDisplay = `${maintenance.hours_to_next.toFixed(1)}h`;
+            } else if (maintenance.hours_to_next < 168) {
+                const days = Math.floor(maintenance.hours_to_next / 24);
+                const hours = maintenance.hours_to_next % 24;
+                hoursDisplay = `${days}d ${hours.toFixed(1)}h`;
+            } else {
+                const weeks = Math.floor(maintenance.hours_to_next / 168);
+                hoursDisplay = `${weeks}w`;
+            }
+            
+            document.
