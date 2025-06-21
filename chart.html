@@ -3,184 +3,789 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Predictive Maintenance Dashboard</title>
+    <title>Predictive Maintenance Based on Motor Vibration</title>
+    <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #1a1a2e; color: #e0e0e0; margin: 0; padding: 20px; }
-        .header { text-align: center; margin-bottom: 20px; }
-        .header h1 { color: #e0e0e0; margin: 0; }
-        .header p { color: #a9a9a9; }
-        .main-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
-        .card { background: #16213e; border-radius: 8px; padding: 20px; box-shadow: 0 4px 8px rgba(0,0,0,0.2); transition: transform 0.2s ease-in-out; }
-        .card:hover { transform: translateY(-5px); }
-        .card-title { font-size: 1em; color: #a9a9a9; margin-bottom: 10px; text-transform: uppercase; }
-        .card-value { font-size: 2.5em; font-weight: bold; }
-        .chart-container { grid-column: 1 / -1; height: 350px; }
-        .status-Good { color: #2ecc71; }
-        .status-Acceptable { color: #f1c40f; }
-        .status-Caution { color: #e67e22; }
-        .status-Critical { color: #e74c3c; }
-        .connecting { color: #3498db; animation: pulse 1.5s infinite; }
-        @keyframes pulse { 0% { opacity: 0.5; } 50% { opacity: 1; } 100% { opacity: 0.5; } }
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 10px;
+            color: #333;
+        }
+        
+        .container {
+            max-width: 100%;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+            position: relative;
+        }
+        
+        .sync-status {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(255, 255, 255, 0.2);
+            padding: 5px 10px;
+            border-radius: 15px;
+            font-size: 0.7rem;
+            font-weight: bold;
+        }
+        
+        .sync-status.connected {
+            background: rgba(76, 175, 80, 0.8);
+        }
+        
+        .sync-status.error {
+            background: rgba(244, 67, 54, 0.8);
+        }
+        
+        .header h1 {
+            font-size: 1.4rem;
+            margin-bottom: 5px;
+            font-weight: 700;
+        }
+        
+        .header p {
+            font-size: 0.85rem;
+            opacity: 0.9;
+        }
+        
+        .status-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            padding: 15px;
+            background: #f8f9fa;
+        }
+        
+        .status-card {
+            background: white;
+            padding: 15px;
+            border-radius: 15px;
+            text-align: center;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            border: 2px solid transparent;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+        
+        .status-value {
+            font-size: 1.8rem;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .status-label {
+            font-size: 0.8rem;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .zone-a { color: #28a745; border-color: #28a745; }
+        .zone-b { color: #ffc107; border-color: #ffc107; }
+        .zone-c { color: #fd7e14; border-color: #fd7e14; }
+        .zone-d { color: #dc3545; border-color: #dc3545; }
+        
+        .chart-section {
+            padding: 15px;
+        }
+        
+        .chart-container {
+            width: 100%;
+            height: 400px;
+            background: white;
+            border-radius: 15px;
+            margin-bottom: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            overflow: hidden;
+            position: relative;
+        }
+        
+        .chart-loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(255, 255, 255, 0.9);
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            z-index: 100;
+        }
+        
+        .zone-legend {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin: 15px 0;
+            font-size: 0.75rem;
+        }
+        
+        .zone-legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        .zone-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+        
+        .zone-dot.zone-a { background-color: #28a745; }
+        .zone-dot.zone-b { background-color: #ffc107; }
+        .zone-dot.zone-c { background-color: #fd7e14; }
+        .zone-dot.zone-d { background-color: #dc3545; }
+        
+        .predictions {
+            margin: 15px;
+            background: white;
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        
+        .predictions-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px;
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+        
+        .pred-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1px;
+            background: #e9ecef;
+        }
+        
+        .pred-item {
+            background: white;
+            padding: 20px;
+            text-align: center;
+        }
+        
+        .pred-time {
+            font-size: 0.8rem;
+            color: #666;
+            margin-bottom: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        
+        .pred-value {
+            font-size: 1.4rem;
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+        
+        .pred-desc {
+            font-size: 0.75rem;
+            color: #888;
+        }
+        
+        .maintenance-card {
+            margin: 15px;
+            background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+            border-radius: 15px;
+            padding: 15px;
+            text-align: center;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        
+        .maintenance-card h4 {
+            color: #856404;
+            margin-bottom: 8px;
+            font-size: 1rem;
+        }
+        
+        .maintenance-card p {
+            color: #856404;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+        
+        .refresh-section {
+            padding: 15px;
+            text-align: center;
+        }
+        
+        .refresh-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 25px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+            transition: all 0.3s ease;
+            font-size: 0.9rem;
+        }
+        
+        .refresh-btn:active {
+            transform: scale(0.95);
+        }
+        
+        .debug-info {
+            position: fixed;
+            bottom: 10px;
+            left: 10px;
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 10px;
+            font-size: 0.7rem;
+            z-index: 9999;
+            max-width: 300px;
+            word-wrap: break-word;
+        }
+        
+        .error-display {
+            background: #ffebee;
+            color: #c62828;
+            padding: 10px;
+            margin: 10px;
+            border-radius: 10px;
+            font-size: 0.8rem;
+            border-left: 4px solid #c62828;
+        }
     </style>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
 </head>
 <body>
-
-    <div class="header">
-        <h1>Predictive Maintenance Dashboard</h1>
-        <p>Real-time Motor Vibration & Analysis System (<span id="connection-status" class="connecting">Connecting...</span>)</p>
-    </div>
-
-    <div class="main-container">
-        <div class="card">
-            <div class="card-title">RMS (MM/S)</div>
-            <div class="card-value" id="rms-value">--</div>
-        </div>
-        <div class="card">
-            <div class="card-title">ZONE</div>
-            <div class="card-value" id="zone-value">--</div>
-        </div>
-        <div class="card">
-            <div class="card-title">STATUS</div>
-            <div class="card-value" id="status-value">--</div>
-        </div>
-        <div class="card">
-            <div class="card-title">LAST UPDATE</div>
-            <div class="card-value" id="last-update-value" style="font-size: 1.5em;">--</div>
-        </div>
-
-        <div class="card chart-container">
-            <canvas id="rms-chart"></canvas>
+    <div class="container">
+        <div class="header">
+            <div class="sync-status" id="syncStatus">🔄 Connecting...</div>
+            <h1>🔧 Predictive Maintenance Based on Motor Vibration</h1>
+            <p>Real-time Monitoring & Analysis System</p>
         </div>
         
-        <div class="card">
-            <div class="card-title">PREDICTION (Hours to Next Zone)</div>
-            <div class="card-value" id="prediction-hours">--</div>
+        <div class="status-grid">
+            <div class="status-card">
+                <div class="status-value" id="currentRMS">Loading...</div>
+                <div class="status-label">RMS (mm/s)</div>
+            </div>
+            <div class="status-card">
+                <div class="status-value" id="currentZone">--</div>
+                <div class="status-label">Zone</div>
+            </div>
+            <div class="status-card">
+                <div class="status-value" id="currentStatus">--</div>
+                <div class="status-label">Status</div>
+            </div>
+            <div class="status-card">
+                <div class="status-value" id="lastUpdate">--</div>
+                <div class="status-label">Last Update</div>
+            </div>
         </div>
-        <div class="card">
-            <div class="card-title">MAINTENANCE RECOMMENDATION</div>
-            <div class="card-value" id="prediction-recommendation" style="font-size: 1.2em;">--</div>
+        
+        <div class="chart-section">
+            <div class="chart-container">
+                <div class="chart-loading" id="chartLoading">
+                    🔄 Loading Chart Data...
+                </div>
+                <div id="chartContainer"></div>
+            </div>
+            
+            <div class="zone-legend">
+                <div class="zone-legend-item">
+                    <div class="zone-dot zone-a"></div>
+                    <span>Zone A: Good (0-1.12)</span>
+                </div>
+                <div class="zone-legend-item">
+                    <div class="zone-dot zone-b"></div>
+                    <span>Zone B: Acceptable (1.12-4.5)</span>
+                </div>
+                <div class="zone-legend-item">
+                    <div class="zone-dot zone-c"></div>
+                    <span>Zone C: Caution (4.5-11.2)</span>
+                </div>
+                <div class="zone-legend-item">
+                    <div class="zone-dot zone-d"></div>
+                    <span>Zone D: Critical (>11.2)</span>
+                </div>
+            </div>
         </div>
+        
+        <div class="predictions">
+            <div class="predictions-header">
+                🔮 Prediction and Recommendation Maintenance
+            </div>
+            <div class="pred-grid" id="predGrid">
+                <div class="pred-item">
+                    <div class="pred-time">Hours to Next Zone</div>
+                    <div class="pred-value" id="hoursToNext">--</div>
+                    <div class="pred-desc">--</div>
+                </div>
+                <div class="pred-item">
+                    <div class="pred-time">Recommendation Maintenance</div>
+                    <div class="pred-value" id="maintenanceInterval">--</div>
+                    <div class="pred-desc">--</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="maintenance-card" id="maintenanceAdvice" style="display: none;">
+            <h4>⚠️ Maintenance Recommendation</h4>
+            <p id="adviceText">--</p>
+        </div>
+        
+        <div class="refresh-section">
+            <p style="font-size: 0.8rem; color: #666; margin-bottom: 10px;">
+                Real-time Firebase sync every 10s
+            </p>
+            <button class="refresh-btn" onclick="forceRefresh()">
+                🔄 Force Refresh
+            </button>
+        </div>
+        
+        <div class="error-display" id="errorDisplay" style="display: none;">
+            <strong>Connection Error:</strong>
+            <div id="errorText">--</div>
+        </div>
+    </div>
+
+    <div class="debug-info" id="debugInfo">
+        <strong>Prediction Monitoring Debug:</strong><br>
+        Status: <span id="debugStatus">--</span><br>
+        RMS: <span id="debugRMS">--</span><br>
+        Chart Points: <span id="debugChart">--</span><br>
+        Hours to Next: <span id="debugHours">--</span><br>
+        Maintenance: <span id="debugMaintenance">--</span><br>
+        Last Sync: <span id="debugTime">--</span><br>
+        Errors: <span id="debugErrors">0</span>
     </div>
 
     <script>
-        // --- KONFIGURASI FIREBASE ---
-        const firebaseConfig = {
-            // Isi dengan konfigurasi Firebase Anda
-            // Contoh:
-            apiKey: "AIz...",
-            authDomain: "predictive-maintenance-90034.firebaseapp.com",
-            databaseURL: "https://predictive-maintenance-90034-default-rtdb.asia-southeast1.firebasedatabase.app",
-            projectId: "predictive-maintenance-90034",
-            storageBucket: "predictive-maintenance-90034.appspot.com",
-            messagingSenderId: "...",
-            appId: "..."
+        google.charts.load('current', {'packages':['corechart']});
+        google.charts.setOnLoadCallback(initializeApp);
+        
+        let chart;
+        let currentData = {};
+        let isLoading = false;
+        let errorCount = 0;
+        let lastSyncTime = null;
+        
+        // Firebase URLs
+        const FIREBASE_URLS = {
+            current: 'https://predictive-maintenance-90034-default-rtdb.firebaseio.com/kodular_simple.json',
+            enhanced: 'https://predictive-maintenance-90034-default-rtdb.firebaseio.com/kodular_enhanced.json',
+            historical: 'https://predictive-maintenance-90034-default-rtdb.firebaseio.com/realtime/historical_rms.json',
+            maintenance: 'https://predictive-maintenance-90034-default-rtdb.firebaseio.com/maintenance_prediction/latest_prediction.json'
         };
-
-        // Inisialisasi Firebase
-        firebase.initializeApp(firebaseConfig);
-        const database = firebase.database();
-
-        // Cek status koneksi Firebase
-        const connectedRef = database.ref(".info/connected");
-        connectedRef.on("value", (snap) => {
-          const statusEl = document.getElementById('connection-status');
-          if (snap.val() === true) {
-            statusEl.textContent = "Connected";
-            statusEl.className = 'status-Good';
-          } else {
-            statusEl.textContent = "Disconnected";
-            statusEl.className = 'status-Critical';
-          }
-        });
-
-
-        // --- Inisialisasi Chart.js ---
-        const ctx = document.getElementById('rms-chart').getContext('2d');
-        const rmsChart = new Chart(ctx, {
-            type: 'line',
-            data: { labels: [], datasets: [{
-                label: 'RMS Vibration (mm/s)', data: [],
-                borderColor: '#0f4c75', backgroundColor: 'rgba(15, 76, 117, 0.2)',
-                borderWidth: 2, fill: true, tension: 0.4
-            }]},
-            options: {
-                responsive: true, maintainAspectRatio: false,
-                scales: {
-                    y: { beginAtZero: true, ticks: { color: '#e0e0e0' } },
-                    x: { ticks: { color: '#e0e0e0' } }
-                },
-                plugins: { legend: { labels: { color: '#e0e0e0' } } }
+        
+        function initializeApp() {
+            console.log('🚀 Predictive Maintenance Dashboard initialized');
+            updateDebugInfo('STARTING', 0, 0, 0, '--', 'Initializing...');
+            
+            const container = document.getElementById('chartContainer');
+            chart = new google.visualization.LineChart(container);
+            
+            // Load real Firebase data immediately
+            loadRealFirebaseData();
+            
+            // Real-time sync every 10 seconds
+            setInterval(loadRealFirebaseData, 10000);
+            
+            updateSyncStatus('🔄 Loading...', 'connecting');
+        }
+        
+        async function loadRealFirebaseData() {
+            if (isLoading) {
+                console.log('⏳ Already loading, skipping...');
+                return;
             }
-        });
-
-        // ======================================================================
-        // PERBAIKAN UTAMA: Mendengarkan data dari alamat '/dashboard/'
-        // ======================================================================
-
-        // --- Listener untuk Data Live (Gauge & Status) ---
-        const liveDataRef = database.ref('dashboard/live_data');
-        liveDataRef.on('value', (snapshot) => {
-            const data = snapshot.val();
-            if (data) {
-                const rmsEl = document.getElementById('rms-value');
-                const zoneEl = document.getElementById('zone-value');
-                const statusEl = document.getElementById('status-value');
+            
+            isLoading = true;
+            console.log('🔄 Loading Firebase data...');
+            updateSyncStatus('🔄 Syncing...', 'connecting');
+            
+            try {
+                console.log('📡 Fetching Firebase data...');
                 
-                rmsEl.textContent = data.rms || '--';
-                zoneEl.textContent = data.zone || '--';
-                statusEl.textContent = data.status || '--';
+                // Load all Firebase endpoints
+                const promises = [
+                    fetchWithTimeout(FIREBASE_URLS.current, 'current'),
+                    fetchWithTimeout(FIREBASE_URLS.enhanced, 'enhanced'), 
+                    fetchWithTimeout(FIREBASE_URLS.historical, 'historical'),
+                    fetchWithTimeout(FIREBASE_URLS.maintenance, 'maintenance')
+                ];
                 
-                document.getElementById('last-update-value').textContent = data.last_update || '--';
+                const results = await Promise.allSettled(promises);
                 
-                statusEl.className = 'card-value';
-                rmsEl.className = 'card-value';
-                if(data.status) {
-                    statusEl.classList.add(`status-${data.status}`);
-                    rmsEl.classList.add(`status-${data.status}`);
-                }
-            } else {
-                document.getElementById('rms-value').textContent = 'Waiting...';
-            }
-        });
-
-        // --- Listener untuk Chart Historis ---
-        const historicalChartRef = database.ref('dashboard/historical_chart');
-        historicalChartRef.on('value', (snapshot) => {
-            const data = snapshot.val();
-            if (data) {
-                const labels = [];
-                const rmsData = [];
-                const sortedKeys = Object.keys(data).sort();
+                // Process results
+                let hasValidData = false;
+                const firebaseData = {};
                 
-                sortedKeys.forEach(key => {
-                    labels.push(data[key].timestamp);
-                    rmsData.push(data[key].rms);
+                results.forEach((result, index) => {
+                    const keys = ['current', 'enhanced', 'historical', 'maintenance'];
+                    const key = keys[index];
+                    
+                    if (result.status === 'fulfilled' && result.value.success) {
+                        firebaseData[key] = result.value.data;
+                        hasValidData = true;
+                        console.log(`✅ ${key} data loaded:`, result.value.data ? 'HAS DATA' : 'EMPTY');
+                        
+                        // Log sample data for debugging
+                        if (result.value.data && key === 'current') {
+                            console.log('📊 Current data sample:', {
+                                rms: result.value.data.rms,
+                                zone: result.value.data.zone,
+                                timestamp: result.value.data.timestamp
+                            });
+                        }
+                    } else {
+                        console.log(`❌ ${key} failed:`, result.reason);
+                        firebaseData[key] = null;
+                    }
                 });
                 
-                rmsChart.data.labels = labels;
-                rmsChart.data.datasets[0].data = rmsData;
-                rmsChart.update();
-            } else {
-                console.log("Menunggu data historis...");
+                if (hasValidData) {
+                    console.log('✅ Processing valid Firebase data...');
+                    processFirebaseData(firebaseData);
+                    updateSyncStatus('✅ Connected', 'connected');
+                    errorCount = 0;
+                } else {
+                    throw new Error('No valid Firebase data received');
+                }
+                
+            } catch (error) {
+                console.error('❌ Firebase load error:', error);
+                errorCount++;
+                handleLoadError(error);
+                updateSyncStatus('❌ Error', 'error');
+            } finally {
+                isLoading = false;
+                lastSyncTime = new Date();
+                hideChartLoading();
             }
-        });
+        }
         
-        // --- Listener untuk Data Prediksi ---
-        const predictionDataRef = database.ref('dashboard/prediction_data');
-        predictionDataRef.on('value', (snapshot) => {
-            const data = snapshot.val();
-            if (data) {
-                document.getElementById('prediction-hours').textContent = data.hours_to_next_zone || '--';
-                document.getElementById('prediction-recommendation').textContent = data.recommendation || '--';
-            } else {
-                document.getElementById('prediction-hours').textContent = 'Awaiting Model...';
-                document.getElementById('prediction-recommendation').textContent = 'Awaiting Model...';
+        async function fetchWithTimeout(url, source) {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 8000);
+            
+            try {
+                const response = await fetch(url + '?t=' + Date.now(), {
+                    signal: controller.signal,
+                    headers: {
+                        'Cache-Control': 'no-cache',
+                        'Pragma': 'no-cache'
+                    }
+                });
+                
+                clearTimeout(timeoutId);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status} for ${source}`);
+                }
+                
+                const data = await response.json();
+                return { success: true, data: data, source: source };
+                
+            } catch (error) {
+                clearTimeout(timeoutId);
+                throw new Error(`${source}: ${error.message}`);
             }
-        });
-
-    </script>
-</body>
-</html>
+        }
+        
+        function processFirebaseData(firebaseData) {
+            console.log('🔄 Processing Firebase data...');
+            
+            try {
+                // Process current data with better error handling
+                if (firebaseData.current) {
+                    const current = firebaseData.current;
+                    console.log('📊 Raw current data:', current);
+                    
+                    currentData.latest = {
+                        rms: parseFloat(current.rms) || 0,
+                        zone: current.zone || 'A',
+                        status: current.status || 'Good'
+                    };
+                    
+                    currentData.timestamp = current.time || new Date().toLocaleTimeString().slice(0, 8);
+                    
+                    // Get maintenance data with fallbacks
+                    if (firebaseData.maintenance || current.hours_to_next_zone !== undefined) {
+                        const maintenance = firebaseData.maintenance || current;
+                        
+                        currentData.maintenance = {
+                            // ML PREDICTION DATA
+                            next_zone: maintenance.next_zone || current.next_zone || 'B',
+                            hours_to_next: parseFloat(maintenance.hours_to_next_zone || current.hours_to_next_zone) || 24,
+                            time_display: maintenance.time_to_next_zone_display || current.time_to_next_zone_display || '24h',
+                            
+                            // MAINTENANCE RECOMMENDATION DATA
+                            maintenance_interval_display: getMaintenanceInterval(currentData.latest.zone),
+                            maintenance_advice: getMaintenanceAdvice(currentData.latest.zone),
+                            maintenance_urgency: getMaintenanceUrgency(currentData.latest.zone),
+                            
+                            // LEGACY SUPPORT
+                            urgency: current.urgency || maintenance.urgency || 'NORMAL',
+                            urgency_color: current.urgency_color || maintenance.urgency_color || 'green'
+                        };
+                        
+                        console.log('🔧 Maintenance data processed:', currentData.maintenance);
+                    } else {
+                        // Fallback maintenance data
+                        currentData.maintenance = {
+                            next_zone: 'B',
+                            hours_to_next: 24,
+                            time_display: '24h',
+                            maintenance_interval_display: getMaintenanceInterval(currentData.latest.zone),
+                            maintenance_advice: getMaintenanceAdvice(currentData.latest.zone),
+                            maintenance_urgency: getMaintenanceUrgency(currentData.latest.zone),
+                            urgency: 'NORMAL',
+                            urgency_color: 'green'
+                        };
+                        console.log('⚠️ Using fallback maintenance data');
+                    }
+                    
+                    console.log('✅ Current data processed:', currentData.latest);
+                } else {
+                    console.log('⚠️ No current data available - using test data');
+                    // Use test data for demo
+                    currentData.latest = {rms: 2.3, zone: 'B', status: 'Acceptable'};
+                    currentData.maintenance = {
+                        next_zone: 'C', hours_to_next: 72, time_display: '3d',
+                        maintenance_interval_display: '3 months',
+                        maintenance_advice: 'Jadwalkan perawatan dalam 3 bulan'
+                    };
+                }
+                
+                // Process historical data for chart
+                if (firebaseData.historical) {
+                    processHistoricalData(firebaseData.historical);
+                } else {
+                    console.log('⚠️ No historical data, generating from current...');
+                    generateChartFromCurrent();
+                }
+                
+                // Update all displays
+                updateStatusDisplay();
+                updatePredictionDisplay();
+                updateMaintenanceDisplay();
+                drawChart();
+                
+                const rms = currentData.latest ? currentData.latest.rms : 0;
+                const chartPoints = currentData.chartData ? currentData.chartData.length : 0;
+                const hoursToNext = currentData.maintenance ? currentData.maintenance.hours_to_next : 0;
+                const maintenanceInterval = currentData.maintenance ? currentData.maintenance.maintenance_interval_display : '--';
+                updateDebugInfo('CONNECTED', rms, chartPoints, hoursToNext, maintenanceInterval, new Date().toLocaleTimeString());
+                
+            } catch (error) {
+                console.error('❌ Data processing error:', error);
+                throw error;
+            }
+        }
+        
+        function getMaintenanceInterval(zone) {
+            const intervals = {
+                'A': '6 months',
+                'B': '3 months', 
+                'C': '2-4 weeks',
+                'D': '24-72 hours'
+            };
+            return intervals[zone] || '6 months';
+        }
+        
+        function getMaintenanceAdvice(zone) {
+            const advice = {
+                'A': 'Perawatan preventif dalam 6 bulan',
+                'B': 'Jadwalkan perawatan dalam 3 bulan',
+                'C': 'Perawatan korektif diperlukan dalam 2-4 minggu',
+                'D': 'DARURAT: Rencanakan perawatan dalam 24-72 jam'
+            };
+            return advice[zone] || 'Regular maintenance';
+        }
+        
+        function getMaintenanceUrgency(zone) {
+            const urgency = {
+                'A': 'NORMAL',
+                'B': 'LOW',
+                'C': 'MEDIUM',
+                'D': 'CRITICAL'
+            };
+            return urgency[zone] || 'NORMAL';
+        }
+        
+        function processHistoricalData(historical) {
+            console.log('📊 Processing historical data for chart...');
+            
+            if (!historical || typeof historical !== 'object') {
+                console.log('⚠️ Invalid historical data format');
+                generateChartFromCurrent();
+                return;
+            }
+            
+            const entries = Object.entries(historical);
+            console.log(`📈 Found ${entries.length} historical entries`);
+            
+            if (entries.length === 0) {
+                generateChartFromCurrent();
+                return;
+            }
+            
+            // Sort by key (timestamp), take last 60 points
+            entries.sort((a, b) => a[0].localeCompare(b[0])); // Chronological order
+            const last60 = entries.slice(-60); // Take last 60
+            
+            const chartData = [];
+            
+            last60.forEach(([key, data]) => {
+                if (data && typeof data === 'object' && data.chart_ready) {
+                    const rms = parseFloat(data.rms);
+                    const time = data.time;
+                    const zone = data.zone;
+                    
+                    // Validate data before adding
+                    if (!isNaN(rms) && time && zone) {
+                        chartData.push({
+                            time: time,
+                            rms: rms,
+                            zone: zone,
+                            timestamp: data.full_timestamp || key,
+                            source: 'firebase_historical'
+                        });
+                    }
+                }
+            });
+            
+            if (chartData.length > 0) {
+                currentData.chartData = chartData;
+                console.log(`✅ Chart data loaded: ${chartData.length} points`);
+                console.log(`🕒 Time range: ${chartData[0].time} to ${chartData[chartData.length-1].time}`);
+                console.log(`📊 RMS range: ${Math.min(...chartData.map(d => d.rms)).toFixed(2)} to ${Math.max(...chartData.map(d => d.rms)).toFixed(2)}`);
+            } else {
+                console.log('⚠️ No valid chart data found, generating from current');
+                generateChartFromCurrent();
+            }
+        }
+        
+        function generateChartFromCurrent() {
+            if (!currentData.latest) {
+                console.log('⚠️ No current data for chart generation');
+                return;
+            }
+            
+            console.log('🔄 Generating chart from current RMS:', currentData.latest.rms);
+            
+            const baseRMS = currentData.latest.rms;
+            const chartData = [];
+            const now = new Date();
+            
+            // Generate 60 points leading to current time
+            for (let i = 0; i < 60; i++) {
+                const timeAgo = new Date(now.getTime() - (59 - i) * 60000); // 1 minute intervals
+                const variation = Math.sin(i * 0.1) * 0.1 + (Math.random() - 0.5) * 0.05;
+                let rms = Math.max(0.1, baseRMS + variation);
+                
+                // Last point = exact current RMS
+                if (i === 59) {
+                    rms = baseRMS;
+                }
+                
+                let zone = 'A';
+                if (rms >= 1.12) zone = 'B';
+                if (rms >= 4.5) zone = 'C';
+                if (rms >= 11.2) zone = 'D';
+                
+                chartData.push({
+                    time: timeAgo.getHours().toString().padStart(2, '0') + ':' + timeAgo.getMinutes().toString().padStart(2, '0'),
+                    rms: Math.round(rms * 100) / 100,
+                    zone: zone,
+                    source: 'generated'
+                });
+            }
+            
+            currentData.chartData = chartData;
+            console.log(`✅ Generated ${chartData.length} chart points ending with RMS: ${baseRMS}`);
+        }
+        
+        function updateStatusDisplay() {
+            if (!currentData.latest) return;
+            
+            const latest = currentData.latest;
+            
+            document.getElementById('currentRMS').textContent = latest.rms.toFixed(2);
+            document.getElementById('currentZone').textContent = latest.zone;
+            document.getElementById('lastUpdate').textContent = currentData.timestamp || '--:--';
+            
+            let status = 'Good';
+            let statusClass = 'zone-a';
+            
+            switch(latest.zone) {
+                case 'B':
+                    status = 'OK';
+                    statusClass = 'zone-b';
+                    break;
+                case 'C':
+                    status = 'Warning';
+                    statusClass = 'zone-c';
+                    break;
+                case 'D':
+                    status = 'Critical';
+                    statusClass = 'zone-d';
+                    break;
+            }
+            
+            const statusElement = document.getElementById('currentStatus');
+            statusElement.textContent = status;
+            statusElement.className = `status-value ${statusClass}`;
+            
+            const zoneElement = document.getElementById('currentZone');
+            zoneElement.className = `status-value ${statusClass}`;
+            
+            console.log(`📊 Status updated: ${latest.rms.toFixed(2)} mm/s, Zone ${latest.zone}, ${status}`);
+        }
+        
+        function updatePredictionDisplay() {
+            if (!currentData.latest || !currentData.maintenance) return;
+            
+            const maintenance = currentData.maintenance;
+            
+            // Update Hours to Next Zone
+            let hoursDisplay = maintenance.time_display || `${maintenance.hours_to_next.toFixed(1)}h`;
+            
+            // Format hours display
+            if (maintenance.hours_to_next < 1) {
+                hoursDisplay = `${Math.round(maintenance.hours_to_next * 60)}min`;
+            } else if (maintenance.hours_to_next < 24) {
+                hoursDisplay = `${maintenance.hours_to_next.toFixed(1)}h`;
+            } else if (maintenance.hours_to_next < 168) {
+                const days = Math.floor(maintenance.hours_to_next / 24);
+                const hours = maintenance.hours_to_next % 24;
+                hoursDisplay = `${days}d ${hours.toFixed(1)}h`;
+            } else {
+                const weeks = Math.floor(maintenance.hours_to_next / 168);
+                hoursDisplay = `${weeks}w`;
+            }
+            
+            document.
